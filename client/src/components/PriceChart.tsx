@@ -1,6 +1,6 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { PriceData } from '../types';
+import type { PriceData } from '../types';
 
 interface PriceChartProps {
     data: PriceData[];

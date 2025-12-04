@@ -20,17 +20,15 @@ namespace CryptoRiskAnalysis.API.Controllers
         [HttpGet("{assetId}")]
         public async Task<ActionResult<RiskAnalysisResponseDto>> GetRiskAnalysis(string assetId)
         {
-            // 1. Fetch Data
-            var priceHistory = await _cryptoDataService.GetHistoricalPriceDataAsync(assetId, 30);
+            // 1. Fetch ALL data in one call (optimized!)
+            var (priceHistory, currentVolume, avgVolume) = await _cryptoDataService.GetAllMarketDataAsync(assetId, 30);
+            
             if (priceHistory == null || !priceHistory.Any())
             {
                 return NotFound($"No data found for asset: {assetId}");
             }
 
-            var currentVolume = await _cryptoDataService.GetCurrentVolumeAsync(assetId);
-            var avgVolume = await _cryptoDataService.GetAverageVolumeAsync(assetId, 30);
-
-            // 2. Calculate Risk
+            // 2. Calculate Risk (100% local - no API calls!)
             var riskResult = _riskEngine.CalculateRisk(priceHistory, currentVolume, avgVolume);
 
             // 3. Map to DTO

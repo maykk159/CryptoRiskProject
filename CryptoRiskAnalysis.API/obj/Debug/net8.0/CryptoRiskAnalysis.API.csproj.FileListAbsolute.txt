@@ -32,3 +32,4 @@ D:\asp.netprojects\CryptoRiskAnalysis.API\CryptoRiskAnalysis.API\obj\Debug\net8.
 D:\asp.netprojects\CryptoRiskAnalysis.API\CryptoRiskAnalysis.API\obj\Debug\net8.0\CryptoRiskAnalysis.API.pdb
 D:\asp.netprojects\CryptoRiskAnalysis.API\CryptoRiskAnalysis.API\obj\Debug\net8.0\CryptoRiskAnalysis.API.genruntimeconfig.cache
 D:\asp.netprojects\CryptoRiskAnalysis.API\CryptoRiskAnalysis.API\obj\Debug\net8.0\ref\CryptoRiskAnalysis.API.dll
+D:\asp.netprojects\CryptoRiskAnalysis.API\CryptoRiskAnalysis.API\obj\Debug\net8.0\CryptoRiskAnalysis.API.sourcelink.json

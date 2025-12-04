@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { RiskAnalysisResponse } from '../types';
+import type { RiskAnalysisResponse } from '../types/index';
 
 const API_URL = 'http://localhost:5058/api';
 

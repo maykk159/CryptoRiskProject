@@ -10,6 +10,9 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// Add Memory Cache
+builder.Services.AddMemoryCache();
+
 // Register Services
 builder.Services.AddHttpClient<ICryptoDataService, CoinGeckoService>();
 builder.Services.AddScoped<IRiskEngine, RiskAnalysisEngine>();
@@ -32,7 +35,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-app.UseHttpsRedirection();
+// app.UseHttpsRedirection();
 
 app.UseCors("AllowReactApp");
 

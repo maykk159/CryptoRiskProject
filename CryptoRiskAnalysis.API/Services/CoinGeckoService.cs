@@ -1,43 +1,160 @@
 using CryptoRiskAnalysis.API.Interfaces;
 using CryptoRiskAnalysis.API.Models;
 using System.Text.Json;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace CryptoRiskAnalysis.API.Services
 {
     public class CoinGeckoService : ICryptoDataService
     {
         private readonly HttpClient _httpClient;
+        private readonly IMemoryCache _cache;
         private const string BaseUrl = "https://api.coingecko.com/api/v3";
 
-        public CoinGeckoService(HttpClient httpClient)
+        public CoinGeckoService(HttpClient httpClient, IMemoryCache cache)
         {
             _httpClient = httpClient;
+            _cache = cache;
         }
+
+        // ✅ OPTIMIZED: Single API call with 60-second cache!
+        public async Task<(List<PriceData> priceHistory, decimal currentVolume, decimal avgVolume)> GetAllMarketDataAsync(string assetId, int days)
+        {
+            string cacheKey = $"market_data_{assetId}_{days}";
+            
+            // 🚀 Check cache first!
+            if (_cache.TryGetValue(cacheKey, out (List<PriceData>, decimal, decimal) cachedData))
+            {
+                Console.WriteLine($"💾 Cache HIT for {assetId} - returning cached data!");
+                return cachedData;
+            }
+
+            Console.WriteLine($"🌐 Cache MISS for {assetId} - fetching from API...");
+            
+            int maxRetries = 3;
+            int baseRetryDelay = 2000;
+
+            for (int i = 0; i < maxRetries; i++)
+            {
+                try
+                {
+                    if (i > 0)
+                    {
+                        int delay = baseRetryDelay * (i + 1);
+                        Console.WriteLine($"⏳ Waiting {delay}ms before retry {i + 1}...");
+                        await Task.Delay(delay);
+                    }
+
+                    var response = await _httpClient.GetAsync($"{BaseUrl}/coins/{assetId}/market_chart?vs_currency=usd&days={days}");
+                    
+                    if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        Console.WriteLine($"⚠️ Rate limit hit for {assetId}, attempt {i + 1}/{maxRetries}");
+                        if (i < maxRetries - 1) continue;
+                        return (new List<PriceData>(), 0, 0);
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    
+                    var content = await response.Content.ReadAsStringAsync();
+                    var data = JsonSerializer.Deserialize<CoinGeckoMarketChart>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (data?.Prices == null || data?.Total_Volumes == null)
+                    {
+                        return (new List<PriceData>(), 0, 0);
+                    }
+
+                    // Extract price history
+                    var priceHistory = data.Prices.Select(p => new PriceData
+                    {
+                        Timestamp = (long)p[0],
+                        Price = (decimal)p[1]
+                    }).ToList();
+
+                    // Extract volumes
+                    var volumes = data.Total_Volumes.Select(v => (decimal)v[1]).ToList();
+                    var currentVolume = volumes.Any() ? volumes.Last() : 0;
+                    var avgVolume = volumes.Any() ? volumes.Average() : 0;
+
+                    var result = (priceHistory, currentVolume, avgVolume);
+                    
+                    // 💾 Store in cache for 60 seconds
+                    var cacheOptions = new MemoryCacheEntryOptions()
+                        .SetAbsoluteExpiration(TimeSpan.FromSeconds(60));
+                    _cache.Set(cacheKey, result, cacheOptions);
+
+                    Console.WriteLine($"✅ Fetched {priceHistory.Count} prices & {volumes.Count} volumes for {assetId} in ONE call! (Cached for 60s)");
+                    return result;
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"❌ HTTP Error for {assetId} (attempt {i + 1}/{maxRetries}): {ex.Message}");
+                    if (i == maxRetries - 1) return (new List<PriceData>(), 0, 0);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error fetching {assetId} (attempt {i + 1}/{maxRetries}): {ex.Message}");
+                    if (i == maxRetries - 1) return (new List<PriceData>(), 0, 0);
+                }
+            }
+
+            return (new List<PriceData>(), 0, 0);
+        }
+
 
         public async Task<List<PriceData>> GetHistoricalPriceDataAsync(string assetId, int days)
         {
-            try
+            int maxRetries = 3;
+            int baseRetryDelay = 2000; // 2 seconds base
+
+            for (int i = 0; i < maxRetries; i++)
             {
-                var response = await _httpClient.GetAsync($"{BaseUrl}/coins/{assetId}/market_chart?vs_currency=usd&days={days}");
-                response.EnsureSuccessStatusCode();
-                
-                var content = await response.Content.ReadAsStringAsync();
-                var data = JsonSerializer.Deserialize<CoinGeckoMarketChart>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-
-                if (data?.Prices == null) return new List<PriceData>();
-
-                return data.Prices.Select(p => new PriceData
+                try
                 {
-                    Timestamp = (long)p[0],
-                    Price = (decimal)p[1]
-                }).ToList();
+                    // Add delay to avoid rate limiting (2s, 4s, 6s)
+                    if (i > 0)
+                    {
+                        int delay = baseRetryDelay * (i + 1);
+                        Console.WriteLine($"Waiting {delay}ms before retry {i + 1}...");
+                        await Task.Delay(delay);
+                    }
+
+                    var response = await _httpClient.GetAsync($"{BaseUrl}/coins/{assetId}/market_chart?vs_currency=usd&days={days}");
+                    
+                    if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
+                    {
+                        Console.WriteLine($"⚠️ Rate limit hit for {assetId}, attempt {i + 1}/{maxRetries}");
+                        if (i < maxRetries - 1) continue; // Retry if not last attempt
+                        return new List<PriceData>(); // Give up on last attempt
+                    }
+
+                    response.EnsureSuccessStatusCode();
+                    
+                    var content = await response.Content.ReadAsStringAsync();
+                    var data = JsonSerializer.Deserialize<CoinGeckoMarketChart>(content, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                    if (data?.Prices == null) return new List<PriceData>();
+
+                    Console.WriteLine($"✅ Successfully fetched {data.Prices.Count} price points for {assetId}");
+                    return data.Prices.Select(p => new PriceData
+                    {
+                        Timestamp = (long)p[0],
+                        Price = (decimal)p[1]
+                    }).ToList();
+                }
+                catch (HttpRequestException ex)
+                {
+                    Console.WriteLine($"❌ HTTP Error for {assetId} (attempt {i + 1}/{maxRetries}): {ex.Message}");
+                    if (i == maxRetries - 1) return new List<PriceData>();
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"❌ Error fetching {assetId} data (attempt {i + 1}/{maxRetries}): {ex.Message}");
+                    if (i == maxRetries - 1) return new List<PriceData>();
+                }
             }
-            catch (Exception ex)
-            {
-                // Graceful handling: return empty list or throw custom exception
-                Console.WriteLine($"Error fetching data: {ex.Message}");
-                return new List<PriceData>();
-            }
+
+            return new List<PriceData>();
         }
 
         public async Task<decimal> GetCurrentVolumeAsync(string assetId)

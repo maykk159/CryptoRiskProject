@@ -9,8 +9,10 @@ const ASSETS = [
     { id: 'bitcoin', name: 'Bitcoin (BTC)' },
     { id: 'ethereum', name: 'Ethereum (ETH)' },
     { id: 'solana', name: 'Solana (SOL)' },
-    { id: 'ripple', name: 'XRP (XRP)' },
+    { id: 'ripple', name: 'Ripple (XRP)' },
     { id: 'cardano', name: 'Cardano (ADA)' },
+    { id: 'binancecoin', name: 'BNB (BNB)' },
+    { id: 'dogecoin', name: 'Dogecoin (DOGE)' },
 ];
 
 export const AssetSelector: React.FC<AssetSelectorProps> = ({ selectedAsset, onSelectAsset }) => {

@@ -1,5 +1,5 @@
 import React from 'react';
-import { RiskAnalysisResponse } from '../types';
+import type { RiskAnalysisResponse } from '../types';
 import clsx from 'clsx';
 
 interface RiskCardProps {
