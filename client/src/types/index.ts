@@ -1,0 +1,13 @@
+export interface PriceData {
+    timestamp: number;
+    price: number;
+}
+
+export interface RiskAnalysisResponse {
+    assetId: string;
+    compositeRiskScore: number;
+    volatilityScore: number;
+    trendScore: number;
+    volumeScore: number;
+    priceHistory: PriceData[];
+}
