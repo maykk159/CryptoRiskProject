@@ -10,7 +10,10 @@ export const api = axios.create({
     },
 });
 
-export const getRiskAnalysis = async (assetId: string): Promise<RiskAnalysisResponse> => {
-    const response = await api.get<RiskAnalysisResponse>(`/RiskAnalysis/${assetId}`);
+export const getRiskAnalysis = async (
+    assetId: string,
+    days: number = 30
+): Promise<RiskAnalysisResponse> => {
+    const response = await api.get<RiskAnalysisResponse>(`/RiskAnalysis/${assetId}?days=${days}`);
     return response.data;
 };

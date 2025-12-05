@@ -27,6 +27,7 @@ const ASSETS = [
 
 export const Dashboard: React.FC = () => {
     const [selectedAsset, setSelectedAsset] = useState<string>('bitcoin');
+    const [selectedTimeRange, setSelectedTimeRange] = useState<number>(30);
     const [data, setData] = useState<RiskAnalysisResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -36,7 +37,7 @@ export const Dashboard: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const result = await getRiskAnalysis(selectedAsset);
+                const result = await getRiskAnalysis(selectedAsset, selectedTimeRange);
                 setData(result);
             } catch (err: any) {
                 console.error('API Error:', err);
@@ -52,7 +53,7 @@ export const Dashboard: React.FC = () => {
         };
 
         fetchData();
-    }, [selectedAsset]);
+    }, [selectedAsset, selectedTimeRange]);
 
     const getRiskLevel = (score: number) => {
         if (score < 30) return { text: 'Low Risk', color: 'text-green-400', bgColor: 'bg-green-400' };
@@ -89,6 +90,42 @@ export const Dashboard: React.FC = () => {
                             </option>
                         ))}
                     </select>
+                </div>
+
+                {/* Time Range Selector */}
+                <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Analysis Period
+                    </label>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setSelectedTimeRange(7)}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedTimeRange === 7
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                }`}
+                        >
+                            7 Days
+                        </button>
+                        <button
+                            onClick={() => setSelectedTimeRange(30)}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedTimeRange === 30
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                }`}
+                        >
+                            30 Days
+                        </button>
+                        <button
+                            onClick={() => setSelectedTimeRange(90)}
+                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedTimeRange === 90
+                                ? 'bg-blue-500 text-white'
+                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
+                                }`}
+                        >
+                            90 Days
+                        </button>
+                    </div>
                 </div>
 
                 {loading && (
@@ -212,7 +249,7 @@ export const Dashboard: React.FC = () => {
 
                         {/* Price History Info */}
                         <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
-                            <h2 className="text-xl font-bold text-white mb-6">30-Day Price History</h2>
+                            <h2 className="text-xl font-bold text-white mb-6">{selectedTimeRange}-Day Price History</h2>
                             <p className="text-gray-400">
                                 Data points: {data.priceHistory.length}
                             </p>

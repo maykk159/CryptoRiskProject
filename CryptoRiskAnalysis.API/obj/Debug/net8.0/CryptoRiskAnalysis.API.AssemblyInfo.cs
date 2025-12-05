@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CryptoRiskAnalysis.API")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+3c0c843adef5716e8a65c70d7b51b8b50b7baa81")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+2e9dd3f41b003309c8e321017337e200f1957fcd")]
 [assembly: System.Reflection.AssemblyProductAttribute("CryptoRiskAnalysis.API")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CryptoRiskAnalysis.API")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

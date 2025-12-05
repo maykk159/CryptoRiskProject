@@ -80,7 +80,7 @@ namespace CryptoRiskAnalysis.API.Services
                     
                     // 💾 Store in cache for 60 seconds
                     var cacheOptions = new MemoryCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromSeconds(60));
+                        .SetAbsoluteExpiration(TimeSpan.FromSeconds(180)); // Increased to 3min
                     _cache.Set(cacheKey, result, cacheOptions);
 
                     Console.WriteLine($"✅ Fetched {priceHistory.Count} prices & {volumes.Count} volumes for {assetId} in ONE call! (Cached for 60s)");

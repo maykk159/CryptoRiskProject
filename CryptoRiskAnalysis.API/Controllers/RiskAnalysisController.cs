@@ -18,10 +18,18 @@ namespace CryptoRiskAnalysis.API.Controllers
         }
 
         [HttpGet("{assetId}")]
-        public async Task<ActionResult<RiskAnalysisResponseDto>> GetRiskAnalysis(string assetId)
+        public async Task<ActionResult<RiskAnalysisResponseDto>> GetRiskAnalysis(
+            string assetId, 
+            [FromQuery] int days = 30)
         {
+            // Validate days parameter - only allow 7, 30, or 90
+            if (days != 7 && days != 30 && days != 90)
+            {
+                days = 30; // Default to 30 if invalid
+            }
+
             // 1. Fetch ALL data in one call (optimized!)
-            var (priceHistory, currentVolume, avgVolume) = await _cryptoDataService.GetAllMarketDataAsync(assetId, 30);
+            var (priceHistory, currentVolume, avgVolume) = await _cryptoDataService.GetAllMarketDataAsync(assetId, days);
             
             if (priceHistory == null || !priceHistory.Any())
             {
