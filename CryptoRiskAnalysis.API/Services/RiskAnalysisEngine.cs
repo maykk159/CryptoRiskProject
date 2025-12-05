@@ -14,11 +14,21 @@ namespace CryptoRiskAnalysis.API.Services
 
             var prices = priceHistory.Select(p => p.Price).ToList();
             
+            // Calculate log returns (more mathematically sound)
+            var returns = CalculateLogReturns(prices);
+            
             // ✅ IMPROVED: Financial-grade risk calculations
-            var volatilityScore = CalculateVolatilityScore(prices);
+            var volatilityScore = CalculateVolatilityScore(returns);
             var trendScore = CalculateTrendScore(prices);
             var volumeScore = CalculateVolumeScore(prices, currentVolume, averageVolume);
             var compositeScore = CalculateCompositeScore(volatilityScore, trendScore, volumeScore);
+            
+            // ✨ NEW: Advanced financial metrics
+            var downsideRisk = CalculateDownsideRisk(returns);
+            var maxDrawdown = CalculateMaximumDrawdown(prices);
+            var sharpeRatio = CalculateSharpeRatio(returns);
+            var valueAtRisk95 = CalculateValueAtRisk95(returns);
+            var annualizedVol = CalculateAnnualizedVolatility(returns);
 
             return new RiskScoreResult
             {
@@ -26,28 +36,39 @@ namespace CryptoRiskAnalysis.API.Services
                 TrendScore = Math.Round(trendScore, 2),
                 VolumeScore = Math.Round(volumeScore, 2),
                 CompositeRiskScore = Math.Round(compositeScore, 2),
+                DownsideRisk = Math.Round(downsideRisk, 2),
+                MaxDrawdown = Math.Round(maxDrawdown, 2),
+                SharpeRatio = Math.Round(sharpeRatio, 2),
+                ValueAtRisk95 = Math.Round(valueAtRisk95, 2),
+                AnnualizedVolatility = Math.Round(annualizedVol, 2),
                 PriceHistory = priceHistory
             };
         }
 
         /// <summary>
-        /// Calculate volatility using returns-based annualized standard deviation
-        /// This is the industry standard for financial volatility measurement
+        /// Calculate log returns from price series
+        /// Log returns are more mathematically sound for financial calculations
         /// </summary>
-        private decimal CalculateVolatilityScore(List<decimal> prices)
+        private List<double> CalculateLogReturns(List<decimal> prices)
         {
-            if (prices.Count < 2) return 50m; // Not enough data
-
-            // Calculate daily returns (log returns for better accuracy)
             var returns = new List<double>();
             for (int i = 1; i < prices.Count; i++)
             {
-                if (prices[i - 1] == 0) continue; // Avoid division by zero
-                var dailyReturn = (double)((prices[i] - prices[i - 1]) / prices[i - 1]);
-                returns.Add(dailyReturn);
+                if (prices[i - 1] == 0 || prices[i] == 0) continue;
+                // Log return: ln(P_t / P_t-1)
+                var logReturn = Math.Log((double)(prices[i] / prices[i - 1]));
+                returns.Add(logReturn);
             }
+            return returns;
+        }
 
-            if (returns.Count < 2) return 50m;
+        /// <summary>
+        /// Calculate volatility using log returns and annualized standard deviation
+        /// This is the industry standard for financial volatility measurement
+        /// </summary>
+        private decimal CalculateVolatilityScore(List<double> returns)
+        {
+            if (returns.Count < 2) return 50m; // Not enough data
 
             // Sample standard deviation (using N-1 for Bessel's correction)
             var mean = returns.Average();
@@ -242,6 +263,114 @@ namespace CryptoRiskAnalysis.API.Services
             }
 
             return Math.Max(0, Math.Min(100, composite));
+        }
+
+        /// <summary>
+        /// Calculate downside risk - volatility of negative returns only
+        /// Focuses on downside movements, ignoring positive returns
+        /// </summary>
+        private decimal CalculateDownsideRisk(List<double> returns)
+        {
+            if (returns.Count < 2) return 0m;
+
+            var downsideReturns = returns.Where(r => r < 0).ToList();
+            if (downsideReturns.Count < 2) return 0m;
+
+            var mean = downsideReturns.Average();
+            var sumOfSquares = downsideReturns.Sum(r => Math.Pow(r - mean, 2));
+            var variance = sumOfSquares / (downsideReturns.Count - 1);
+            var downsideStdDev = Math.Sqrt(variance);
+
+            // Annualize and convert to percentage
+            var annualizedDownside = downsideStdDev * Math.Sqrt(365) * 100;
+            return (decimal)annualizedDownside;
+        }
+
+        /// <summary>
+        /// Calculate maximum drawdown - largest peak-to-trough decline
+        /// Key metric for understanding worst-case scenario
+        /// </summary>
+        private decimal CalculateMaximumDrawdown(List<decimal> prices)
+        {
+            if (prices.Count < 2) return 0m;
+
+            decimal maxDrawdown = 0m;
+            decimal peak = prices[0];
+
+            foreach (var price in prices)
+            {
+                if (price > peak)
+                    peak = price;
+
+                var drawdown = (peak - price) / peak * 100; // Percentage decline
+                if (drawdown > maxDrawdown)
+                    maxDrawdown = drawdown;
+            }
+
+            return maxDrawdown;
+        }
+
+        /// <summary>
+        /// Calculate Sharpe ratio - risk-adjusted return metric
+        /// Higher is better (more return per unit of risk)
+        /// </summary>
+        private decimal CalculateSharpeRatio(List<double> returns)
+        {
+            if (returns.Count < 2) return 0m;
+
+            var mean = returns.Average();
+            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
+            var variance = sumOfSquares / (returns.Count - 1);
+            var stdDev = Math.Sqrt(variance);
+
+            if (stdDev == 0) return 0m;
+
+            // Sharpe = (Mean Return - Risk Free Rate) / StdDev
+            // Using 0% risk-free rate for crypto (no true risk-free baseline)
+            var sharpe = mean / stdDev;
+
+            // Annualize the Sharpe ratio
+            var annualizedSharpe = sharpe * Math.Sqrt(365);
+
+            return (decimal)annualizedSharpe;
+        }
+
+        /// <summary>
+        /// Calculate Value at Risk at 95% confidence level
+        /// Represents worst-case loss in 95% of scenarios
+        /// </summary>
+        private decimal CalculateValueAtRisk95(List<double> returns)
+        {
+            if (returns.Count < 20) return 0m; // Need sufficient data for percentiles
+
+            var sortedReturns = returns.OrderBy(r => r).ToList();
+            
+            // 5th percentile (95% confidence - worst 5%)
+            var index = (int)(sortedReturns.Count * 0.05);
+            var var95 = sortedReturns[index];
+
+            // Annualize and convert to percentage (make positive for clarity)
+            var annualizedVaR = Math.Abs(var95 * Math.Sqrt(365) * 100);
+
+            return (decimal)annualizedVaR;
+        }
+
+        /// <summary>
+        /// Calculate raw annualized volatility as a percentage
+        /// </summary>
+        private decimal CalculateAnnualizedVolatility(List<double> returns)
+        {
+            if (returns.Count < 2) return 0m;
+
+            var mean = returns.Average();
+            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
+            var variance = sumOfSquares / (returns.Count - 1);
+            var dailyStdDev = Math.Sqrt(variance);
+
+            // Annualize and convert to percentage
+            var annualizedVolatility = dailyStdDev * Math.Sqrt(365) * 100;
+
+            return (decimal)annualizedVolatility;
         }
     }
 }

@@ -9,5 +9,13 @@ export interface RiskAnalysisResponse {
     volatilityScore: number;
     trendScore: number;
     volumeScore: number;
+
+    // Advanced financial metrics
+    downsideRisk: number;
+    maxDrawdown: number;
+    sharpeRatio: number;
+    valueAtRisk95: number;
+    annualizedVolatility: number;
+
     priceHistory: PriceData[];
 }

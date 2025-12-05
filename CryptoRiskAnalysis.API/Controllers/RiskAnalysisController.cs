@@ -39,6 +39,11 @@ namespace CryptoRiskAnalysis.API.Controllers
                 VolatilityScore = riskResult.VolatilityScore,
                 TrendScore = riskResult.TrendScore,
                 VolumeScore = riskResult.VolumeScore,
+                DownsideRisk = riskResult.DownsideRisk,
+                MaxDrawdown = riskResult.MaxDrawdown,
+                SharpeRatio = riskResult.SharpeRatio,
+                ValueAtRisk95 = riskResult.ValueAtRisk95,
+                AnnualizedVolatility = riskResult.AnnualizedVolatility,
                 PriceHistory = riskResult.PriceHistory
             };
 
