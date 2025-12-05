@@ -43,7 +43,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 - **Advanced Algorithms** - Annualized volatility, momentum analysis, volume context
 - **Smart Caching** - 60-second in-memory cache to avoid API rate limits
 - **Responsive UI** - Beautiful Tailwind CSS design
-- **7 Cryptocurrencies** - Bitcoin, Ethereum, Solana, Ripple, Cardano, BNB, Dogecoin
+- **20 Cryptocurrencies** - Bitcoin, Ethereum, Tether, XRP, BNB, Solana, USDC, TRON, Dogecoin, Cardano, Avalanche, Chainlink, Shiba Inu, Bitcoin Cash, Stellar, Polkadot, Litecoin, Uniswap, Wrapped Bitcoin, Dai
 
 ## 🏗️ Architecture
 
