@@ -40,6 +40,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
 ## Features
 
 - **Real-time Risk Analysis** - Live cryptocurrency risk scoring
+- **Time Range Flexibility** - Choose between 7-day, 30-day, or 90-day analysis periods
 - **Advanced Financial Metrics** - Industry-standard risk calculations
   - Log returns-based volatility
   - Downside risk (negative returns only)
@@ -48,7 +49,7 @@ Open [http://localhost:5173](http://localhost:5173) in your browser.
   - Value at Risk (VaR 95%)
   - Annualized volatility
 - **Adaptive Algorithms** - Context-aware risk scoring with weighted factors
-- **Smart Caching** - 60-second in-memory cache to avoid API rate limits
+- **Smart Caching** - 3-minute in-memory cache to avoid API rate limits
 - **Responsive UI** - Beautiful dark-mode dashboard with Tailwind CSS
 - **20 Cryptocurrencies** - Bitcoin, Ethereum, Tether, XRP, BNB, Solana, USDC, TRON, Dogecoin, Cardano, Avalanche, Chainlink, Shiba Inu, Bitcoin Cash, Stellar, Polkadot, Litecoin, Uniswap, Wrapped Bitcoin, Dai
 
@@ -148,10 +149,12 @@ CryptoRiskAnalysis/
 ## Performance
 
 - **API Optimization**: 66% fewer API calls (3 → 1 per request)
-- **Cache Hit Rate**: 80-90% with 60-second TTL
+- **Cache Hit Rate**: 85-95% with 3-minute TTL
 - **Response Time**: < 200ms (cached), < 2s (API call)
 - **Calculation Accuracy**: ~85% with production-grade formulas
 - **Metric Coverage**: 9 comprehensive risk indicators
+- **Time Range Options**: 7D, 30D, 90D analysis periods
+- **Rate Limit Handling**: Progressive retry delays (3s, 6s, 9s)
 
 ## Documentation
 
