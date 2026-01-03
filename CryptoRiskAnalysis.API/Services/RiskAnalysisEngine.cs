@@ -5,6 +5,29 @@ namespace CryptoRiskAnalysis.API.Services
 {
     public class RiskAnalysisEngine : IRiskEngine
     {
+        // Risk calculation constants
+        private const decimal EXTREME_MOMENTUM_THRESHOLD = 0.30m;  // 30% movement
+        private const decimal SIGNIFICANT_MOMENTUM_THRESHOLD = 0.15m;  // 15% movement
+        private const decimal MODERATE_MOMENTUM_THRESHOLD = 0.05m;  // 5% movement
+        
+        private const decimal EXTREME_MOMENTUM_BASE_SCORE = 80m;
+        private const decimal SIGNIFICANT_MOMENTUM_BASE_SCORE = 50m;
+        private const decimal MODERATE_MOMENTUM_BASE_SCORE = 20m;
+        
+        private const decimal EXTREME_MOMENTUM_MULTIPLIER = 200m;
+        private const decimal SIGNIFICANT_MOMENTUM_MULTIPLIER = 200m;
+        private const decimal MODERATE_MOMENTUM_MULTIPLIER = 300m;
+        private const decimal STABLE_MOMENTUM_MULTIPLIER = 400m;
+        
+        private const decimal VOLATILITY_MODERATE_THRESHOLD = 0.5m;  // 50% annual volatility
+        private const decimal VOLATILITY_HIGH_THRESHOLD = 1.0m;  // 100% annual volatility
+        
+        private const decimal HIGH_RISK_THRESHOLD = 70m;
+        private const decimal LOW_RISK_THRESHOLD = 30m;
+        
+        private const int CRYPTO_TRADING_DAYS_PER_YEAR = 365;  // Crypto trades 24/7
+        private const int SHORT_TERM_DAYS = 7;
+        private const int MINIMUM_DATA_POINTS = 7;
         public RiskScoreResult CalculateRisk(List<PriceData> priceHistory, decimal currentVolume, decimal averageVolume)
         {
             if (priceHistory == null || !priceHistory.Any())
@@ -78,18 +101,18 @@ namespace CryptoRiskAnalysis.API.Services
 
             // Annualize the volatility (standard financial practice)
             // Daily volatility * sqrt(365) for crypto (24/7 trading)
-            var annualizedVolatility = dailyStdDev * Math.Sqrt(365);
+            var annualizedVolatility = dailyStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR);
 
             // Convert to 0-100 scale
             // Crypto typical annual volatility: 50% = moderate, 100% = high, 200%+ = extreme
             // Score mapping: 0% -> 0, 50% -> 50, 100% -> 75, 200%+ -> 100
             decimal score;
-            if (annualizedVolatility < 0.5) // < 50% annual vol
+            if ((decimal)annualizedVolatility < VOLATILITY_MODERATE_THRESHOLD) // < 50% annual vol
                 score = (decimal)annualizedVolatility * 100; // 0-50
-            else if (annualizedVolatility < 1.0) // 50-100% annual vol
-                score = 50 + ((decimal)annualizedVolatility - 0.5m) * 50; // 50-75
+            else if ((decimal)annualizedVolatility < VOLATILITY_HIGH_THRESHOLD) // 50-100% annual vol
+                score = 50 + ((decimal)annualizedVolatility - VOLATILITY_MODERATE_THRESHOLD) * 50; // 50-75
             else // > 100% annual vol
-                score = Math.Min(100, 75 + ((decimal)annualizedVolatility - 1.0m) * 25); // 75-100
+                score = Math.Min(100, 75 + ((decimal)annualizedVolatility - VOLATILITY_HIGH_THRESHOLD) * 25); // 75-100
 
             return score;
         }
@@ -100,10 +123,10 @@ namespace CryptoRiskAnalysis.API.Services
         /// </summary>
         private decimal CalculateTrendScore(List<decimal> prices)
         {
-            if (prices.Count < 7) return 50m; // Not enough data for trend
+            if (prices.Count < MINIMUM_DATA_POINTS) return 50m; // Not enough data for trend
 
             // Calculate short-term (7-day) vs long-term (30-day) momentum
-            var recent7Days = prices.Skip(Math.Max(0, prices.Count - 7)).ToList();
+            var recent7Days = prices.Skip(Math.Max(0, prices.Count - SHORT_TERM_DAYS)).ToList();
             var avg7Day = recent7Days.Average();
             var avg30Day = prices.Average();
 
@@ -115,25 +138,25 @@ namespace CryptoRiskAnalysis.API.Services
             // Pump & dump, panic selling, volatility spikes all = high risk
             decimal score;
 
-            if (absMomentum > 0.30m) // > 30% extreme movement
+            if (absMomentum > EXTREME_MOMENTUM_THRESHOLD)
             {
                 // Very high risk - potential pump/dump or crash
-                score = Math.Min(100, 80 + (absMomentum - 0.30m) * 200);
+                score = Math.Min(100, EXTREME_MOMENTUM_BASE_SCORE + (absMomentum - EXTREME_MOMENTUM_THRESHOLD) * EXTREME_MOMENTUM_MULTIPLIER);
             }
-            else if (absMomentum > 0.15m) // 15-30% significant movement
+            else if (absMomentum > SIGNIFICANT_MOMENTUM_THRESHOLD)
             {
                 // High risk - strong momentum
-                score = 50 + (absMomentum - 0.15m) * 200;
+                score = SIGNIFICANT_MOMENTUM_BASE_SCORE + (absMomentum - SIGNIFICANT_MOMENTUM_THRESHOLD) * SIGNIFICANT_MOMENTUM_MULTIPLIER;
             }
-            else if (absMomentum > 0.05m) // 5-15% moderate movement
+            else if (absMomentum > MODERATE_MOMENTUM_THRESHOLD)
             {
                 // Moderate risk - normal trend
-                score = 20 + (absMomentum - 0.05m) * 300;
+                score = MODERATE_MOMENTUM_BASE_SCORE + (absMomentum - MODERATE_MOMENTUM_THRESHOLD) * MODERATE_MOMENTUM_MULTIPLIER;
             }
-            else // < 5% stable
+            else
             {
                 // Low risk - stable price
-                score = absMomentum * 400;
+                score = absMomentum * STABLE_MOMENTUM_MULTIPLIER;
             }
 
             return score;
@@ -215,21 +238,21 @@ namespace CryptoRiskAnalysis.API.Services
             // ✅ ADAPTIVE WEIGHTING based on market conditions
             
             // When volatility is extreme, it dominates
-            if (volatilityScore > 75)
+            if (volatilityScore > HIGH_RISK_THRESHOLD)
             {
                 volWeight = 0.50m;
                 trendWeight = 0.25m;
                 volumeWeight = 0.25m;
             }
             // When trend is extreme, it's critical
-            else if (trendScore > 80)
+            else if (trendScore > HIGH_RISK_THRESHOLD + 10)
             {
                 volWeight = 0.30m;
                 trendWeight = 0.45m;
                 volumeWeight = 0.25m;
             }
             // When volume shows panic/manipulation
-            else if (volumeScore > 75)
+            else if (volumeScore > HIGH_RISK_THRESHOLD)
             {
                 volWeight = 0.35m;
                 trendWeight = 0.25m;
@@ -244,20 +267,20 @@ namespace CryptoRiskAnalysis.API.Services
             // ✅ RISK AMPLIFICATION: Multiple high risks compound
             
             // All three high = systemic risk
-            if (volatilityScore > 70 && trendScore > 70 && volumeScore > 70)
+            if (volatilityScore > HIGH_RISK_THRESHOLD && trendScore > HIGH_RISK_THRESHOLD && volumeScore > HIGH_RISK_THRESHOLD)
             {
                 composite = Math.Min(100, composite * 1.20m); // 20% penalty
             }
             // Two high = significant risk
-            else if ((volatilityScore > 70 && trendScore > 70) ||
-                     (volatilityScore > 70 && volumeScore > 70) ||
-                     (trendScore > 70 && volumeScore > 70))
+            else if ((volatilityScore > HIGH_RISK_THRESHOLD && trendScore > HIGH_RISK_THRESHOLD) ||
+                     (volatilityScore > HIGH_RISK_THRESHOLD && volumeScore > HIGH_RISK_THRESHOLD) ||
+                     (trendScore > HIGH_RISK_THRESHOLD && volumeScore > HIGH_RISK_THRESHOLD))
             {
                 composite = Math.Min(100, composite * 1.10m); // 10% penalty
             }
 
             // ✅ RISK DAMPENING: Low across the board = extra safe
-            if (volatilityScore < 30 && trendScore < 30 && volumeScore < 30)
+            if (volatilityScore < LOW_RISK_THRESHOLD && trendScore < LOW_RISK_THRESHOLD && volumeScore < LOW_RISK_THRESHOLD)
             {
                 composite = composite * 0.90m; // 10% bonus (reduce risk score)
             }
@@ -282,7 +305,7 @@ namespace CryptoRiskAnalysis.API.Services
             var downsideStdDev = Math.Sqrt(variance);
 
             // Annualize and convert to percentage
-            var annualizedDownside = downsideStdDev * Math.Sqrt(365) * 100;
+            var annualizedDownside = downsideStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100;
             return (decimal)annualizedDownside;
         }
 
@@ -330,7 +353,7 @@ namespace CryptoRiskAnalysis.API.Services
             var sharpe = mean / stdDev;
 
             // Annualize the Sharpe ratio
-            var annualizedSharpe = sharpe * Math.Sqrt(365);
+            var annualizedSharpe = sharpe * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR);
 
             return (decimal)annualizedSharpe;
         }
@@ -350,7 +373,7 @@ namespace CryptoRiskAnalysis.API.Services
             var var95 = sortedReturns[index];
 
             // Annualize and convert to percentage (make positive for clarity)
-            var annualizedVaR = Math.Abs(var95 * Math.Sqrt(365) * 100);
+            var annualizedVaR = Math.Abs(var95 * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100);
 
             return (decimal)annualizedVaR;
         }
@@ -368,7 +391,7 @@ namespace CryptoRiskAnalysis.API.Services
             var dailyStdDev = Math.Sqrt(variance);
 
             // Annualize and convert to percentage
-            var annualizedVolatility = dailyStdDev * Math.Sqrt(365) * 100;
+            var annualizedVolatility = dailyStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100;
 
             return (decimal)annualizedVolatility;
         }

@@ -1,5 +1,6 @@
 using CryptoRiskAnalysis.API.DTOs;
 using CryptoRiskAnalysis.API.Interfaces;
+using CryptoRiskAnalysis.API.Wrappers;
 using Microsoft.AspNetCore.Mvc;
 
 namespace CryptoRiskAnalysis.API.Controllers
@@ -10,21 +11,29 @@ namespace CryptoRiskAnalysis.API.Controllers
     {
         private readonly ICryptoDataService _cryptoDataService;
         private readonly IRiskEngine _riskEngine;
+        private readonly ILogger<RiskAnalysisController> _logger;
 
-        public RiskAnalysisController(ICryptoDataService cryptoDataService, IRiskEngine riskEngine)
+        public RiskAnalysisController(
+            ICryptoDataService cryptoDataService, 
+            IRiskEngine riskEngine,
+            ILogger<RiskAnalysisController> logger)
         {
             _cryptoDataService = cryptoDataService;
             _riskEngine = riskEngine;
+            _logger = logger;
         }
 
         [HttpGet("{assetId}")]
-        public async Task<ActionResult<RiskAnalysisResponseDto>> GetRiskAnalysis(
+        public async Task<ActionResult<ApiResponse<RiskAnalysisResponseDto>>> GetRiskAnalysis(
             string assetId, 
             [FromQuery] int days = 30)
         {
+            _logger.LogInformation("Received risk analysis request for {AssetId} over {Days} days", assetId, days);
+
             // Validate days parameter - only allow 7, 30, or 90
             if (days != 7 && days != 30 && days != 90)
             {
+                _logger.LogWarning("Invalid days parameter: {Days}. Defaulting to 30.", days);
                 days = 30; // Default to 30 if invalid
             }
 
@@ -33,14 +42,15 @@ namespace CryptoRiskAnalysis.API.Controllers
             
             if (priceHistory == null || !priceHistory.Any())
             {
-                return NotFound($"No data found for asset: {assetId}");
+                _logger.LogWarning("No data found for asset: {AssetId}", assetId);
+                return NotFound(new ApiResponse<RiskAnalysisResponseDto>($"No data found for asset: {assetId}"));
             }
 
             // 2. Calculate Risk (100% local - no API calls!)
             var riskResult = _riskEngine.CalculateRisk(priceHistory, currentVolume, avgVolume);
 
             // 3. Map to DTO
-            var response = new RiskAnalysisResponseDto
+            var responseDto = new RiskAnalysisResponseDto
             {
                 AssetId = assetId,
                 CompositeRiskScore = riskResult.CompositeRiskScore,
@@ -55,7 +65,9 @@ namespace CryptoRiskAnalysis.API.Controllers
                 PriceHistory = riskResult.PriceHistory
             };
 
-            return Ok(response);
+            _logger.LogInformation("Successfully calculated risk for {AssetId}: Score {Score}", assetId, riskResult.CompositeRiskScore);
+
+            return Ok(new ApiResponse<RiskAnalysisResponseDto>(responseDto));
         }
     }
 }

@@ -104,28 +104,31 @@ client/
 
 1. **Dashboard** (165 lines)
    - Main layout and state management
-   - Asset selection
+   - Asset selection with **Smart Logos**
    - Data fetching with loading/error states
    - Risk score display
 
 2. **AssetSelector** (40 lines)
    - Dropdown for cryptocurrency selection
-   - 7 supported assets
+   - Displays **Asset Name, Ticker, and Icon**
+   - 20 supported assets
 
-3. **RiskCard** (60 lines)
-   - Visual risk score display
+3. **RiskCard** (75 lines)
+   - Visual risk score display with **Asset Branding Header**
    - Color-coded risk levels
    - Progress bars for individual metrics
 
 4. **PriceChart** (52 lines)
    - 30-day price history chart
-   - Interactive tooltips
+   - Interactive tooltips with **Formatted Dates**
    - Responsive design
+   - Optimized X-axis labels
 
 ### Styling
 
 - **Tailwind CSS 3** - Utility-first CSS
 - **Dark Theme** - Professional dark mode design
+- **Crypto Icons** - CDN-fetched logos for all assets
 - **Responsive** - Mobile, tablet, desktop layouts
 - **Gradients** - Modern visual effects
 

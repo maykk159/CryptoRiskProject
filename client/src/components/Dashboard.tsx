@@ -1,32 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { getRiskAnalysis } from '../services/api';
 import type { RiskAnalysisResponse } from '../types';
-
-const ASSETS = [
-    { id: 'bitcoin', name: 'Bitcoin (BTC)' },
-    { id: 'ethereum', name: 'Ethereum (ETH)' },
-    { id: 'tether', name: 'Tether (USDT)' },
-    { id: 'ripple', name: 'Ripple (XRP)' },
-    { id: 'binancecoin', name: 'BNB (BNB)' },
-    { id: 'solana', name: 'Solana (SOL)' },
-    { id: 'usd-coin', name: 'USDC (USDC)' },
-    { id: 'tron', name: 'TRON (TRX)' },
-    { id: 'dogecoin', name: 'Dogecoin (DOGE)' },
-    { id: 'cardano', name: 'Cardano (ADA)' },
-    { id: 'avalanche-2', name: 'Avalanche (AVAX)' },
-    { id: 'chainlink', name: 'Chainlink (LINK)' },
-    { id: 'shiba-inu', name: 'Shiba Inu (SHIB)' },
-    { id: 'bitcoin-cash', name: 'Bitcoin Cash (BCH)' },
-    { id: 'stellar', name: 'Stellar (XLM)' },
-    { id: 'polkadot', name: 'Polkadot (DOT)' },
-    { id: 'litecoin', name: 'Litecoin (LTC)' },
-    { id: 'uniswap', name: 'Uniswap (UNI)' },
-    { id: 'wrapped-bitcoin', name: 'Wrapped Bitcoin (WBTC)' },
-    { id: 'dai', name: 'Dai (DAI)' },
-];
+import { ASSETS } from '../constants/assets';
+import { TimeRangeSelector } from './dashboard/TimeRangeSelector';
+import { RiskScoreCard } from './dashboard/RiskScoreCard';
+import { AdvancedMetrics } from './dashboard/AdvancedMetrics';
+import { PriceChart } from './PriceChart';
 
 export const Dashboard: React.FC = () => {
-    const [selectedAsset, setSelectedAsset] = useState<string>('bitcoin');
+    const [selectedAssetId, setSelectedAssetId] = useState<string>('bitcoin');
+    const selectedAsset = ASSETS.find(a => a.id === selectedAssetId) || ASSETS[0];
     const [selectedTimeRange, setSelectedTimeRange] = useState<number>(30);
     const [data, setData] = useState<RiskAnalysisResponse | null>(null);
     const [loading, setLoading] = useState<boolean>(false);
@@ -37,29 +20,35 @@ export const Dashboard: React.FC = () => {
             setLoading(true);
             setError(null);
             try {
-                const result = await getRiskAnalysis(selectedAsset, selectedTimeRange);
+                const result = await getRiskAnalysis(selectedAssetId, selectedTimeRange);
                 setData(result);
             } catch (err: any) {
                 console.error('API Error:', err);
-                const errorMsg = err.response?.status === 429
-                    ? 'API rate limit exceeded. Please wait a few seconds and try again.'
-                    : err.response?.status === 404
-                        ? `Crypto asset "${selectedAsset}" not found. Please select a different asset.`
-                        : 'Failed to fetch risk analysis data. Please check your internet connection and try again.';
-                setError(errorMsg);
+
+                // Prioritize the error message coming from our API wrapper
+                if (err.message && err.message !== 'Network Error') {
+                    setError(err.message);
+                }
+                // Handle Axios specific response errors
+                else if (err.response) {
+                    const status = err.response.status;
+                    if (status === 429) {
+                        setError('API rate limit exceeded. Please wait a few seconds and try again.');
+                    } else if (status === 404) {
+                        setError(`Crypto asset "${selectedAsset.name}" not found. Please select a different asset.`);
+                    } else {
+                        setError('Failed to fetch data from the server.');
+                    }
+                } else {
+                    setError('Failed to connect to the server. Please check your internet connection.');
+                }
             } finally {
                 setLoading(false);
             }
         };
 
         fetchData();
-    }, [selectedAsset, selectedTimeRange]);
-
-    const getRiskLevel = (score: number) => {
-        if (score < 30) return { text: 'Low Risk', color: 'text-green-400', bgColor: 'bg-green-400' };
-        if (score < 70) return { text: 'Medium Risk', color: 'text-yellow-400', bgColor: 'bg-yellow-400' };
-        return { text: 'High Risk', color: 'text-red-400', bgColor: 'bg-red-400' };
-    };
+    }, [selectedAssetId, selectedTimeRange]);
 
     return (
         <div className="min-h-screen bg-gray-900 text-white p-8">
@@ -80,53 +69,20 @@ export const Dashboard: React.FC = () => {
                     </label>
                     <select
                         id="asset-select"
-                        value={selectedAsset}
-                        onChange={(e) => setSelectedAsset(e.target.value)}
+                        value={selectedAssetId}
+                        onChange={(e) => setSelectedAssetId(e.target.value)}
                         className="block w-full px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
                     >
                         {ASSETS.map((asset) => (
                             <option key={asset.id} value={asset.id}>
-                                {asset.name}
+                                {asset.name} ({asset.ticker})
                             </option>
                         ))}
                     </select>
                 </div>
 
                 {/* Time Range Selector */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                        Analysis Period
-                    </label>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setSelectedTimeRange(7)}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedTimeRange === 7
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                }`}
-                        >
-                            7 Days
-                        </button>
-                        <button
-                            onClick={() => setSelectedTimeRange(30)}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedTimeRange === 30
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                }`}
-                        >
-                            30 Days
-                        </button>
-                        <button
-                            onClick={() => setSelectedTimeRange(90)}
-                            className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedTimeRange === 90
-                                ? 'bg-blue-500 text-white'
-                                : 'bg-gray-800 text-gray-300 hover:bg-gray-700'
-                                }`}
-                        >
-                            90 Days
-                        </button>
-                    </div>
-                </div>
+                <TimeRangeSelector value={selectedTimeRange} onChange={setSelectedTimeRange} />
 
                 {loading && (
                     <div className="flex justify-center items-center h-64">
@@ -142,121 +98,9 @@ export const Dashboard: React.FC = () => {
 
                 {!loading && !error && data && (
                     <div className="grid grid-cols-1 gap-8">
-                        {/* Risk Card */}
-                        <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
-                            <h2 className="text-xl font-bold text-white mb-6">Risk Analysis</h2>
-
-                            <div className="flex items-center justify-between mb-8 p-4 bg-gray-900 rounded-lg">
-                                <div>
-                                    <p className="text-gray-400 text-sm">Composite Risk Score</p>
-                                    <p className={`text-3xl font-bold ${getRiskLevel(data.compositeRiskScore).color}`}>
-                                        {data.compositeRiskScore.toFixed(1)}
-                                    </p>
-                                </div>
-                                <div className={`text-lg font-semibold px-4 py-2 rounded-full ${getRiskLevel(data.compositeRiskScore).color}`}>
-                                    {getRiskLevel(data.compositeRiskScore).text}
-                                </div>
-                            </div>
-
-                            <div className="space-y-6">
-                                {/* Volatility Score */}
-                                <div className="mb-4">
-                                    <div className="flex justify-between mb-1">
-                                        <span className="text-sm font-medium text-gray-300">Volatility Risk</span>
-                                        <span className="text-sm font-medium text-white">{data.volatilityScore.toFixed(1)}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                        <div
-                                            className="h-2.5 rounded-full bg-purple-500"
-                                            style={{ width: `${Math.min(100, Math.max(0, data.volatilityScore))}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                {/* Trend Score */}
-                                <div className="mb-4">
-                                    <div className="flex justify-between mb-1">
-                                        <span className="text-sm font-medium text-gray-300">Trend Risk</span>
-                                        <span className="text-sm font-medium text-white">{data.trendScore.toFixed(1)}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                        <div
-                                            className="h-2.5 rounded-full bg-blue-500"
-                                            style={{ width: `${Math.min(100, Math.max(0, data.trendScore))}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-
-                                {/* Volume Score */}
-                                <div className="mb-4">
-                                    <div className="flex justify-between mb-1">
-                                        <span className="text-sm font-medium text-gray-300">Volume Risk</span>
-                                        <span className="text-sm font-medium text-white">{data.volumeScore.toFixed(1)}</span>
-                                    </div>
-                                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                        <div
-                                            className="h-2.5 rounded-full bg-orange-500"
-                                            style={{ width: `${Math.min(100, Math.max(0, data.volumeScore))}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Advanced Financial Metrics */}
-                        <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
-                            <h2 className="text-xl font-bold text-white mb-6">Advanced Metrics</h2>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Downside Risk */}
-                                <div className="bg-gray-900 p-4 rounded-lg" title="Volatility of negative returns only - measures downside risk">
-                                    <p className="text-gray-400 text-sm mb-1">Downside Risk</p>
-                                    <p className="text-white text-lg font-semibold">{data.downsideRisk.toFixed(2)}%</p>
-                                    <p className="text-gray-500 text-xs mt-1">Downside volatility only</p>
-                                </div>
-
-                                {/* Max Drawdown */}
-                                <div className="bg-gray-900 p-4 rounded-lg" title="Largest peak-to-trough decline in the period">
-                                    <p className="text-gray-400 text-sm mb-1">Max Drawdown</p>
-                                    <p className="text-red-400 text-lg font-semibold">-{data.maxDrawdown.toFixed(2)}%</p>
-                                    <p className="text-gray-500 text-xs mt-1">Worst-case decline</p>
-                                </div>
-
-                                {/* Sharpe Ratio */}
-                                <div className="bg-gray-900 p-4 rounded-lg" title="Risk-adjusted return metric - higher is better">
-                                    <p className="text-gray-400 text-sm mb-1">Sharpe Ratio</p>
-                                    <p className={`text-lg font-semibold ${data.sharpeRatio >= 1 ? 'text-green-400' : data.sharpeRatio >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                        {data.sharpeRatio.toFixed(2)}
-                                    </p>
-                                    <p className="text-gray-500 text-xs mt-1">Risk-adjusted return</p>
-                                </div>
-
-                                {/* VaR 95% */}
-                                <div className="bg-gray-900 p-4 rounded-lg" title="95% confidence worst-case loss">
-                                    <p className="text-gray-400 text-sm mb-1">VaR (95%)</p>
-                                    <p className="text-orange-400 text-lg font-semibold">-{data.valueAtRisk95.toFixed(2)}%</p>
-                                    <p className="text-gray-500 text-xs mt-1">95% confidence loss</p>
-                                </div>
-
-                                {/* Annualized Volatility */}
-                                <div className="bg-gray-900 p-4 rounded-lg col-span-1 md:col-span-2" title="Standard deviation annualized">
-                                    <p className="text-gray-400 text-sm mb-1">Annualized Volatility</p>
-                                    <p className="text-purple-400 text-lg font-semibold">{data.annualizedVolatility.toFixed(2)}%</p>
-                                    <p className="text-gray-500 text-xs mt-1">Historical price volatility</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Price History Info */}
-                        <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
-                            <h2 className="text-xl font-bold text-white mb-6">{selectedTimeRange}-Day Price History</h2>
-                            <p className="text-gray-400">
-                                Data points: {data.priceHistory.length}
-                            </p>
-                            <p className="text-gray-400">
-                                Latest price: ${data.priceHistory[data.priceHistory.length - 1]?.price.toLocaleString()}
-                            </p>
-                        </div>
+                        <RiskScoreCard data={data} asset={selectedAsset} />
+                        <AdvancedMetrics data={data} />
+                        <PriceChart data={data.priceHistory} timeRange={selectedTimeRange} />
                     </div>
                 )}
             </div>

@@ -2,6 +2,7 @@ using CryptoRiskAnalysis.API.Interfaces;
 using CryptoRiskAnalysis.API.Models;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Logging;
 
 namespace CryptoRiskAnalysis.API.Services
 {
@@ -9,12 +10,14 @@ namespace CryptoRiskAnalysis.API.Services
     {
         private readonly HttpClient _httpClient;
         private readonly IMemoryCache _cache;
+        private readonly ILogger<CoinGeckoService> _logger;
         private const string BaseUrl = "https://api.coingecko.com/api/v3";
 
-        public CoinGeckoService(HttpClient httpClient, IMemoryCache cache)
+        public CoinGeckoService(HttpClient httpClient, IMemoryCache cache, ILogger<CoinGeckoService> logger)
         {
             _httpClient = httpClient;
             _cache = cache;
+            _logger = logger;
         }
 
         // ✅ OPTIMIZED: Single API call with 60-second cache!
@@ -25,11 +28,11 @@ namespace CryptoRiskAnalysis.API.Services
             // 🚀 Check cache first!
             if (_cache.TryGetValue(cacheKey, out (List<PriceData>, decimal, decimal) cachedData))
             {
-                Console.WriteLine($"💾 Cache HIT for {assetId} - returning cached data!");
+                _logger.LogDebug("CoinGecko Cache HIT for {AssetId} - returning cached data", assetId);
                 return cachedData;
             }
 
-            Console.WriteLine($"🌐 Cache MISS for {assetId} - fetching from API...");
+            _logger.LogInformation("CoinGecko Cache MISS for {AssetId} - fetching from API", assetId);
             
             int maxRetries = 3;
             int baseRetryDelay = 2000;
@@ -41,7 +44,7 @@ namespace CryptoRiskAnalysis.API.Services
                     if (i > 0)
                     {
                         int delay = baseRetryDelay * (i + 1);
-                        Console.WriteLine($"⏳ Waiting {delay}ms before retry {i + 1}...");
+                        _logger.LogWarning("CoinGecko retry {Attempt}, waiting {Delay}ms for {AssetId}", i + 1, delay, assetId);
                         await Task.Delay(delay);
                     }
 
@@ -49,7 +52,7 @@ namespace CryptoRiskAnalysis.API.Services
                     
                     if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                     {
-                        Console.WriteLine($"⚠️ Rate limit hit for {assetId}, attempt {i + 1}/{maxRetries}");
+                        _logger.LogWarning("CoinGecko rate limit hit for {AssetId}, attempt {Attempt}/{MaxRetries}", assetId, i + 1, maxRetries);
                         if (i < maxRetries - 1) continue;
                         return (new List<PriceData>(), 0, 0);
                     }
@@ -78,22 +81,22 @@ namespace CryptoRiskAnalysis.API.Services
 
                     var result = (priceHistory, currentVolume, avgVolume);
                     
-                    // 💾 Store in cache for 60 seconds
+                    // 💾 Store in cache for 3 minutes (180 seconds)
                     var cacheOptions = new MemoryCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromSeconds(180)); // Increased to 3min
+                        .SetAbsoluteExpiration(TimeSpan.FromSeconds(180));
                     _cache.Set(cacheKey, result, cacheOptions);
 
-                    Console.WriteLine($"✅ Fetched {priceHistory.Count} prices & {volumes.Count} volumes for {assetId} in ONE call! (Cached for 60s)");
+                    _logger.LogInformation("CoinGecko: Fetched {PriceCount} prices & {VolumeCount} volumes for {AssetId} - Cached for 3 minutes", priceHistory.Count, volumes.Count, assetId);
                     return result;
                 }
                 catch (HttpRequestException ex)
                 {
-                    Console.WriteLine($"❌ HTTP Error for {assetId} (attempt {i + 1}/{maxRetries}): {ex.Message}");
+                    _logger.LogError(ex, "CoinGecko HTTP Error for {AssetId} (attempt {Attempt}/{MaxRetries})", assetId, i + 1, maxRetries);
                     if (i == maxRetries - 1) return (new List<PriceData>(), 0, 0);
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"❌ Error fetching {assetId} (attempt {i + 1}/{maxRetries}): {ex.Message}");
+                    _logger.LogError(ex, "CoinGecko Error fetching {AssetId} (attempt {Attempt}/{MaxRetries})", assetId, i + 1, maxRetries);
                     if (i == maxRetries - 1) return (new List<PriceData>(), 0, 0);
                 }
             }
@@ -209,8 +212,8 @@ namespace CryptoRiskAnalysis.API.Services
         // Helper class for deserialization
         private class CoinGeckoMarketChart
         {
-            public List<List<double>> Prices { get; set; }
-            public List<List<double>> Total_Volumes { get; set; }
+            public List<List<double>> Prices { get; set; } = new();
+            public List<List<double>> Total_Volumes { get; set; } = new();
         }
     }
 }
