@@ -1,6 +1,6 @@
 # 📊 Crypto Risk Analysis
 
-Full-stack cryptocurrency risk analysis application with real-time data from CoinGecko API.
+Full-stack cryptocurrency risk analysis application with real-time data from **Binance Spot API** & **CoinGecko API**.
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
@@ -170,7 +170,8 @@ No API keys required for standard usage (Public Endpoints).
 
 ## Known Issues
 
-- **CoinGecko Rate Limits**: Free tier has ~10-50 calls/minute. App uses caching and retry logic to mitigate.
+- **Rate Limits**: Hybrid engine minimizes impact, but CoinGecko fallback (free tier) has ~10-50 calls/minute.
+- **Binance IP Bans**: Excessive requests without caching could trigger temporary IP bans (auto-mitigated by our 60s cache).
 - **CORS**: Backend must run on port 5058, frontend on 5173
 
 ## Contributing
@@ -192,7 +193,8 @@ MIT License - see [LICENSE](LICENSE) file for details
 
 ## Acknowledgments
 
-- [CoinGecko](https://www.coingecko.com/) for free cryptocurrency API
+- [Binance](https://www.binance.com/) for high-performance Spot Data
+- [CoinGecko](https://www.coingecko.com/) for extensive asset metadata
 - Clean Architecture principles
 - Financial risk calculation standards
 
