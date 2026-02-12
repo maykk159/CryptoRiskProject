@@ -110,7 +110,20 @@ namespace CryptoRiskAnalysis.API.Services
                         Price = k[4].ValueKind == JsonValueKind.String
                             ? decimal.Parse(k[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
                             : k[4].GetDecimal()
-                    }).ToList();
+                    }).OrderBy(p => p.Timestamp).ToList();
+
+                    // DEBUG: Data Order Verification
+                    if (priceHistory.Any())
+                    {
+                        var first = priceHistory.First();
+                        var last = priceHistory.Last();
+                        _logger.LogInformation($"[DATA DEBUG] Fetched {priceHistory.Count} records. First: {DateTimeOffset.FromUnixTimeMilliseconds(first.Timestamp)} | Last: {DateTimeOffset.FromUnixTimeMilliseconds(last.Timestamp)}");
+                        
+                        if (first.Timestamp > last.Timestamp)
+                        {
+                            _logger.LogError("CRITICAL: DATA IS REVERSED! NEWEST FIRST! RISK CALCS WILL BE WRONG!");
+                        }
+                    }
 
                     // 6. Calculate volume metrics (volume is at index 5)
                     var volumes = klines.Select(k => 

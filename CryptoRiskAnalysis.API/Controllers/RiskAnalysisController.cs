@@ -37,8 +37,12 @@ namespace CryptoRiskAnalysis.API.Controllers
                 days = 30; // Default to 30 if invalid
             }
 
+            // FIX: Always fetch at least 30 days for trend/volatility calculation context
+            // Trend score requires 30-day MA comparison, so 7 days is insufficient for calculation.
+            int calculationDays = Math.Max(days, 30);
+
             // 1. Fetch ALL data in one call (optimized!)
-            var (priceHistory, currentVolume, avgVolume) = await _cryptoDataService.GetAllMarketDataAsync(assetId, days);
+            var (priceHistory, currentVolume, avgVolume) = await _cryptoDataService.GetAllMarketDataAsync(assetId, calculationDays);
             
             if (priceHistory == null || !priceHistory.Any())
             {
@@ -46,14 +50,29 @@ namespace CryptoRiskAnalysis.API.Controllers
                 return NotFound(new ApiResponse<RiskAnalysisResponseDto>($"No data found for asset: {assetId}"));
             }
 
-            // 2. Calculate Risk (100% local - no API calls!)
-            var riskResult = _riskEngine.CalculateRisk(priceHistory, currentVolume, avgVolume);
+            // FIX: Use only the requested period for risk calculation
+            // Keep the full dataset for trend calculation context (30-day MA)
+            var calculationData = priceHistory.Count > days 
+                ? priceHistory.TakeLast(days).ToList() 
+                : priceHistory;
 
-            // 3. Map to DTO
+            // 2. Calculate Risk (100% local - no API calls!)
+            var riskResult = _riskEngine.CalculateRisk(calculationData, currentVolume, avgVolume);
+
             // 3. Map to DTO
             var responseDto = new RiskAnalysisResponseDto(assetId, riskResult);
 
-            _logger.LogInformation("Successfully calculated risk for {AssetId}: Score {Score}", assetId, riskResult.CompositeRiskScore);
+            // FIX: Filter the returned price history to match the requested days
+            // If user asked for 7 days but we fetched 30 for calculation, only return the last 7 to chart.
+            if (responseDto.PriceHistory.Count > days)
+            {
+                responseDto.PriceHistory = responseDto.PriceHistory
+                    .TakeLast(days)
+                    .ToList();
+            }
+
+            _logger.LogInformation("Successfully calculated risk for {AssetId}: Score {Score}. returning {Count} history points.", 
+                assetId, riskResult.CompositeRiskScore, responseDto.PriceHistory.Count);
 
             return Ok(new ApiResponse<RiskAnalysisResponseDto>(responseDto));
         }

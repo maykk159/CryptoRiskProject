@@ -34,8 +34,8 @@ export const AdvancedMetrics: React.FC<AdvancedMetricsProps> = ({ data }) => {
                 <div className="bg-gray-900 p-4 rounded-lg" title="Risk-adjusted return metric - higher is better">
                     <p className="text-gray-400 text-sm mb-1">Sharpe Ratio</p>
                     <p className={`text-lg font-semibold ${data.sharpeRatio >= 1 ? 'text-green-400' :
-                            data.sharpeRatio >= 0 ? 'text-yellow-400' :
-                                'text-red-400'
+                        data.sharpeRatio >= 0 ? 'text-yellow-400' :
+                            'text-red-400'
                         }`}>
                         {data.sharpeRatio.toFixed(2)}
                     </p>
