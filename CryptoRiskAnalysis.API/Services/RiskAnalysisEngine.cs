@@ -30,7 +30,7 @@ namespace CryptoRiskAnalysis.API.Services
         private const int MINIMUM_DATA_POINTS = 7;
         public RiskScoreResult CalculateRisk(List<PriceData> priceHistory, decimal currentVolume, decimal averageVolume)
         {
-            if (priceHistory == null || !priceHistory.Any())
+            if (priceHistory == null || priceHistory.Count == 0)
             {
                 return new RiskScoreResult();
             }
@@ -93,11 +93,7 @@ namespace CryptoRiskAnalysis.API.Services
         {
             if (returns.Count < 2) return 50m; // Not enough data
 
-            // Sample standard deviation (using N-1 for Bessel's correction)
-            var mean = returns.Average();
-            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (returns.Count - 1); // N-1 correction
-            var dailyStdDev = Math.Sqrt(variance);
+            var dailyStdDev = CalculateStdDev(returns);
 
             // Annualize the volatility (standard financial practice)
             // Daily volatility * sqrt(365) for crypto (24/7 trading)
@@ -299,10 +295,7 @@ namespace CryptoRiskAnalysis.API.Services
             var downsideReturns = returns.Where(r => r < 0).ToList();
             if (downsideReturns.Count < 2) return 0m;
 
-            var mean = downsideReturns.Average();
-            var sumOfSquares = downsideReturns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (downsideReturns.Count - 1);
-            var downsideStdDev = Math.Sqrt(variance);
+            var downsideStdDev = CalculateStdDev(downsideReturns);
 
             // Annualize and convert to percentage
             var annualizedDownside = downsideStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100;
@@ -341,12 +334,10 @@ namespace CryptoRiskAnalysis.API.Services
         {
             if (returns.Count < 2) return 0m;
 
-            var mean = returns.Average();
-            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (returns.Count - 1);
-            var stdDev = Math.Sqrt(variance);
-
+            var stdDev = CalculateStdDev(returns);
             if (stdDev == 0) return 0m;
+
+            var mean = returns.Average();
 
             // Sharpe = (Mean Return - Risk Free Rate) / StdDev
             // Using 0% risk-free rate for crypto (no true risk-free baseline)
@@ -385,15 +376,24 @@ namespace CryptoRiskAnalysis.API.Services
         {
             if (returns.Count < 2) return 0m;
 
-            var mean = returns.Average();
-            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (returns.Count - 1);
-            var dailyStdDev = Math.Sqrt(variance);
+            var dailyStdDev = CalculateStdDev(returns);
 
             // Annualize and convert to percentage
             var annualizedVolatility = dailyStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100;
 
             return (decimal)annualizedVolatility;
+        }
+
+        /// <summary>
+        /// Calculate sample standard deviation (Bessel's correction: N-1)
+        /// Shared helper to avoid code duplication across risk calculations
+        /// </summary>
+        private static double CalculateStdDev(List<double> values)
+        {
+            var mean = values.Average();
+            var sumOfSquares = values.Sum(v => Math.Pow(v - mean, 2));
+            var variance = sumOfSquares / (values.Count - 1);
+            return Math.Sqrt(variance);
         }
     }
 }

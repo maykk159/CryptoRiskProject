@@ -50,20 +50,8 @@ namespace CryptoRiskAnalysis.API.Controllers
             var riskResult = _riskEngine.CalculateRisk(priceHistory, currentVolume, avgVolume);
 
             // 3. Map to DTO
-            var responseDto = new RiskAnalysisResponseDto
-            {
-                AssetId = assetId,
-                CompositeRiskScore = riskResult.CompositeRiskScore,
-                VolatilityScore = riskResult.VolatilityScore,
-                TrendScore = riskResult.TrendScore,
-                VolumeScore = riskResult.VolumeScore,
-                DownsideRisk = riskResult.DownsideRisk,
-                MaxDrawdown = riskResult.MaxDrawdown,
-                SharpeRatio = riskResult.SharpeRatio,
-                ValueAtRisk95 = riskResult.ValueAtRisk95,
-                AnnualizedVolatility = riskResult.AnnualizedVolatility,
-                PriceHistory = riskResult.PriceHistory
-            };
+            // 3. Map to DTO
+            var responseDto = new RiskAnalysisResponseDto(assetId, riskResult);
 
             _logger.LogInformation("Successfully calculated risk for {AssetId}: Score {Score}", assetId, riskResult.CompositeRiskScore);
 

@@ -12,16 +12,13 @@ namespace CryptoRiskAnalysis.API.Services
     {
         private readonly BinanceSpotService _binanceService;
         private readonly CoinGeckoService _coinGeckoService;
-        private readonly HttpClient _httpClient; // Required by AddHttpClient but not used directly
         private readonly ILogger<HybridCryptoDataService> _logger;
 
         public HybridCryptoDataService(
-            HttpClient httpClient,
             BinanceSpotService binanceService, 
             CoinGeckoService coinGeckoService,
             ILogger<HybridCryptoDataService> logger)
         {
-            _httpClient = httpClient;
             _binanceService = binanceService;
             _coinGeckoService = coinGeckoService;
             _logger = logger;
