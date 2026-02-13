@@ -376,16 +376,26 @@ namespace CryptoRiskAnalysis.API.Services
         /// </summary>
         private decimal CalculateValueAtRisk95(List<double> returns)
         {
-            if (returns.Count < 20) return 0m; // Need sufficient data for percentiles
+            if (returns.Count < 5) return 0m; // Need at least 5 data points
 
             var sortedReturns = returns.OrderBy(r => r).ToList();
             
-            // 5th percentile (95% confidence - worst 5%)
-            var index = (int)(sortedReturns.Count * 0.05);
-            var var95 = sortedReturns[index];
+            // For small datasets (< 20 points), use worst return instead of percentile
+            // For larger datasets, use 5th percentile (95% confidence - worst 5%)
+            double var95;
+            if (sortedReturns.Count < 20)
+            {
+                // Use worst return (most conservative estimate)
+                var95 = sortedReturns.First();
+            }
+            else
+            {
+                // Standard 5th percentile calculation
+                var index = (int)(sortedReturns.Count * 0.05);
+                var95 = sortedReturns[index];
+            }
 
             // Convert to percentage (make positive for clarity)
-            // REMOVED: Annualization multiplier to prevent >100% values
             var dailyVaR = Math.Abs(var95 * 100);
 
             return (decimal)dailyVaR;
