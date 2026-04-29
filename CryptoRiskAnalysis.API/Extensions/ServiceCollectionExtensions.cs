@@ -13,7 +13,7 @@ namespace CryptoRiskAnalysis.API.Extensions
             // Register API Services with HttpClient
             services.AddHttpClient<CoinGeckoService>();
             services.AddHttpClient<BinanceSpotService>();
-            services.AddHttpClient<HybridCryptoDataService>();
+            services.AddScoped<HybridCryptoDataService>();
 
             // Register HybridCryptoDataService as the implementation of ICryptoDataService
             services.AddScoped<ICryptoDataService>(sp => sp.GetRequiredService<HybridCryptoDataService>());
