@@ -1,6 +1,7 @@
 using System.Net;
 using System.Text.Json;
 using CryptoRiskAnalysis.API.Wrappers;
+using Microsoft.Extensions.Hosting;
 
 namespace CryptoRiskAnalysis.API.Middleware
 {
@@ -8,11 +9,13 @@ namespace CryptoRiskAnalysis.API.Middleware
     {
         private readonly RequestDelegate _next;
         private readonly ILogger<ExceptionHandlingMiddleware> _logger;
+        private readonly IHostEnvironment _env;
 
-        public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger)
+        public ExceptionHandlingMiddleware(RequestDelegate next, ILogger<ExceptionHandlingMiddleware> logger, IHostEnvironment env)
         {
             _next = next;
             _logger = logger;
+            _env = env;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -28,20 +31,21 @@ namespace CryptoRiskAnalysis.API.Middleware
             }
         }
 
-        private static async Task HandleExceptionAsync(HttpContext context, Exception exception)
+        private async Task HandleExceptionAsync(HttpContext context, Exception exception)
         {
             context.Response.ContentType = "application/json";
             context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
-            var response = new ApiResponse<string>(exception.Message)
+            // In production, hide the exception message for security
+            string message = _env.IsDevelopment() ? exception.Message : "Internal Server Error";
+            
+            var response = new ApiResponse<string>(message)
             {
                 Succeeded = false,
-                Errors = new List<string> { exception.Message }
+                Errors = _env.IsDevelopment() 
+                    ? new List<string> { exception.Message, exception.StackTrace ?? string.Empty }
+                    : new List<string> { "An error occurred while processing your request." }
             };
-
-            // In production, you might want to hide the exception message
-            // response.Message = "Internal Server Error";
-            // response.Errors = null;
 
             var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
             var json = JsonSerializer.Serialize(response, options);

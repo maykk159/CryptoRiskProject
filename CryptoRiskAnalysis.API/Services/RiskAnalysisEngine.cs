@@ -30,7 +30,7 @@ namespace CryptoRiskAnalysis.API.Services
         private const int MINIMUM_DATA_POINTS = 7;
         public RiskScoreResult CalculateRisk(List<PriceData> priceHistory, decimal currentVolume, decimal averageVolume)
         {
-            if (priceHistory == null || !priceHistory.Any())
+            if (priceHistory == null || priceHistory.Count == 0)
             {
                 return new RiskScoreResult();
             }
@@ -53,6 +53,26 @@ namespace CryptoRiskAnalysis.API.Services
             var valueAtRisk95 = CalculateValueAtRisk95(returns);
             var annualizedVol = CalculateAnnualizedVolatility(returns);
 
+            return new RiskScoreResult
+            {
+                VolatilityScore = Math.Round(volatilityScore, 2),
+                TrendScore = Math.Round(trendScore, 2),
+                VolumeScore = Math.Round(volumeScore, 2),
+                CompositeRiskScore = Math.Round(compositeScore, 2),
+                DownsideRisk = Math.Round(downsideRisk, 2),
+                MaxDrawdown = Math.Round(maxDrawdown, 2),
+                SharpeRatio = Math.Round(sharpeRatio, 2),
+                ValueAtRisk95 = Math.Round(valueAtRisk95, 2),
+                AnnualizedVolatility = Math.Round(annualizedVol, 2),
+                PriceHistory = priceHistory
+            };
+
+            // DEBUG LOGGING
+            Console.WriteLine($"[RISK DEBUG] Volatility: DailyStdDev={CalculateStdDev(returns):F4}, Annualized={(decimal)CalculateStdDev(returns) * (decimal)Math.Sqrt(365) * 100:F2}% -> Score={volatilityScore}");
+            Console.WriteLine($"[RISK DEBUG] Trend: Momentum={(CalculateTrendScore(prices) == 50 ? "N/A" : "Checked")}, RawTrendScore={trendScore}");
+            Console.WriteLine($"[RISK DEBUG] Volume: Current={currentVolume}, Avg={averageVolume}, Ratio={currentVolume/averageVolume:F2} -> Score={volumeScore}");
+            Console.WriteLine($"[RISK DEBUG] Composite: {compositeScore} (Amplified?)");
+            
             return new RiskScoreResult
             {
                 VolatilityScore = Math.Round(volatilityScore, 2),
@@ -93,11 +113,7 @@ namespace CryptoRiskAnalysis.API.Services
         {
             if (returns.Count < 2) return 50m; // Not enough data
 
-            // Sample standard deviation (using N-1 for Bessel's correction)
-            var mean = returns.Average();
-            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (returns.Count - 1); // N-1 correction
-            var dailyStdDev = Math.Sqrt(variance);
+            var dailyStdDev = CalculateStdDev(returns);
 
             // Annualize the volatility (standard financial practice)
             // Daily volatility * sqrt(365) for crypto (24/7 trading)
@@ -117,21 +133,22 @@ namespace CryptoRiskAnalysis.API.Services
             return score;
         }
 
-        /// <summary>
-        /// Calculate trend risk using momentum analysis with extreme movement detection
-        /// Extreme movements in BOTH directions indicate high risk
-        /// </summary>
         private decimal CalculateTrendScore(List<decimal> prices)
         {
             if (prices.Count < MINIMUM_DATA_POINTS) return 50m; // Not enough data for trend
 
-            // Calculate short-term (7-day) vs long-term (30-day) momentum
-            var recent7Days = prices.Skip(Math.Max(0, prices.Count - SHORT_TERM_DAYS)).ToList();
-            var avg7Day = recent7Days.Average();
-            var avg30Day = prices.Average();
+            // ADAPTIVE: Calculate short-term vs long-term momentum based on available data
+            // For 7 days: compare last 3 days vs all 7 days
+            // For 30 days: compare last 7 days vs all 30 days
+            // For 90 days: compare last 7 days vs all 90 days
+            int shortTermDays = prices.Count >= 30 ? SHORT_TERM_DAYS : Math.Max(3, prices.Count / 3);
+            
+            var recentDays = prices.Skip(Math.Max(0, prices.Count - shortTermDays)).ToList();
+            var avgRecent = recentDays.Average();
+            var avgLongTerm = prices.Average();
 
             // Momentum: short-term avg vs long-term avg
-            var momentum = (avg7Day - avg30Day) / avg30Day;
+            var momentum = (avgRecent - avgLongTerm) / avgLongTerm;
             var absMomentum = Math.Abs(momentum);
 
             // CRITICAL: Extreme movements (both up and down) indicate risk!
@@ -299,12 +316,9 @@ namespace CryptoRiskAnalysis.API.Services
             var downsideReturns = returns.Where(r => r < 0).ToList();
             if (downsideReturns.Count < 2) return 0m;
 
-            var mean = downsideReturns.Average();
-            var sumOfSquares = downsideReturns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (downsideReturns.Count - 1);
-            var downsideStdDev = Math.Sqrt(variance);
+            var downsideStdDev = CalculateStdDev(downsideReturns);
 
-            // Annualize and convert to percentage
+            // Annualize and convert to percentage (standard financial metric)
             var annualizedDownside = downsideStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100;
             return (decimal)annualizedDownside;
         }
@@ -341,18 +355,16 @@ namespace CryptoRiskAnalysis.API.Services
         {
             if (returns.Count < 2) return 0m;
 
-            var mean = returns.Average();
-            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (returns.Count - 1);
-            var stdDev = Math.Sqrt(variance);
-
+            var stdDev = CalculateStdDev(returns);
             if (stdDev == 0) return 0m;
+
+            var mean = returns.Average();
 
             // Sharpe = (Mean Return - Risk Free Rate) / StdDev
             // Using 0% risk-free rate for crypto (no true risk-free baseline)
             var sharpe = mean / stdDev;
 
-            // Annualize the Sharpe ratio
+            // Annualize the Sharpe ratio (standard financial metric)
             var annualizedSharpe = sharpe * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR);
 
             return (decimal)annualizedSharpe;
@@ -364,18 +376,29 @@ namespace CryptoRiskAnalysis.API.Services
         /// </summary>
         private decimal CalculateValueAtRisk95(List<double> returns)
         {
-            if (returns.Count < 20) return 0m; // Need sufficient data for percentiles
+            if (returns.Count < 5) return 0m; // Need at least 5 data points
 
             var sortedReturns = returns.OrderBy(r => r).ToList();
             
-            // 5th percentile (95% confidence - worst 5%)
-            var index = (int)(sortedReturns.Count * 0.05);
-            var var95 = sortedReturns[index];
+            // For small datasets (< 20 points), use worst return instead of percentile
+            // For larger datasets, use 5th percentile (95% confidence - worst 5%)
+            double var95;
+            if (sortedReturns.Count < 20)
+            {
+                // Use worst return (most conservative estimate)
+                var95 = sortedReturns.First();
+            }
+            else
+            {
+                // Standard 5th percentile calculation
+                var index = (int)(sortedReturns.Count * 0.05);
+                var95 = sortedReturns[index];
+            }
 
-            // Annualize and convert to percentage (make positive for clarity)
-            var annualizedVaR = Math.Abs(var95 * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100);
+            // Convert to percentage (make positive for clarity)
+            var dailyVaR = Math.Abs(var95 * 100);
 
-            return (decimal)annualizedVaR;
+            return (decimal)dailyVaR;
         }
 
         /// <summary>
@@ -385,15 +408,24 @@ namespace CryptoRiskAnalysis.API.Services
         {
             if (returns.Count < 2) return 0m;
 
-            var mean = returns.Average();
-            var sumOfSquares = returns.Sum(r => Math.Pow(r - mean, 2));
-            var variance = sumOfSquares / (returns.Count - 1);
-            var dailyStdDev = Math.Sqrt(variance);
+            var dailyStdDev = CalculateStdDev(returns);
 
             // Annualize and convert to percentage
             var annualizedVolatility = dailyStdDev * Math.Sqrt(CRYPTO_TRADING_DAYS_PER_YEAR) * 100;
 
             return (decimal)annualizedVolatility;
+        }
+
+        /// <summary>
+        /// Calculate sample standard deviation (Bessel's correction: N-1)
+        /// Shared helper to avoid code duplication across risk calculations
+        /// </summary>
+        private static double CalculateStdDev(List<double> values)
+        {
+            var mean = values.Average();
+            var sumOfSquares = values.Sum(v => Math.Pow(v - mean, 2));
+            var variance = sumOfSquares / (values.Count - 1);
+            return Math.Sqrt(variance);
         }
     }
 }

@@ -1,209 +1,153 @@
 # 📊 Crypto Risk Analysis
 
-Full-stack cryptocurrency risk analysis application with real-time data from **Binance Spot API** & **CoinGecko API**.
+> **Professional Financial Risk Assessment for Cryptocurrency Assets**
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)
-![React](https://img.shields.io/badge/React-19.2-blue.svg)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![.NET](https://img.shields.io/badge/.NET-8.0-purple.svg)](https://dotnet.microsoft.com/)
+[![React](https://img.shields.io/badge/React-19.2-blue.svg)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-blue.svg)](https://www.typescriptlang.org/)
 
-## Quick Start
+## 📖 Overview
 
-### Prerequisites
+**CryptoRiskAnalysis** is a high-performance, full-stack application designed to deliver institutional-grade risk metrics for digital assets. By leveraging a **Hybrid Data Engine**, it seamlessly aggregates real-time market data from **Binance Spot API** and **CoinGecko**, providing robust volatility tracking, trend analysis, and advanced financial indicators.
 
-- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
-- [Node.js 18+](https://nodejs.org/)
-- [npm 9+](https://www.npmjs.com/)
-
-### Installation & Run
-
-```powershell
-# Clone the repository
-git clone https://github.com/maykk159/CryptoRiskProject.git
-cd CryptoRiskProject
-
-# Backend
-cd CryptoRiskAnalysis.API
-dotnet restore
-dotnet run --project CryptoRiskAnalysis.API/CryptoRiskAnalysis.API.csproj
-# Backend will run on http://localhost:5058
-
-# Frontend (in a new terminal)
-cd client
-npm install
-npm run dev
-# Frontend will run on http://localhost:5173
-```
-
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-## Features
-
-- **Hybrid Data Engine** - Smart routing between **Binance Spot API** (primary) and **CoinGecko** (fallback)
-- **Real-time Risk Analysis** - Live cryptocurrency risk scoring
-- **Time Range Flexibility** - Choose between 7-day, 30-day, or 90-day analysis periods
-- **Advanced Financial Metrics** - Industry-standard risk calculations
-  - Log returns-based volatility
-  - Downside risk (negative returns only)
-  - Maximum drawdown tracking
-  - Sharpe ratio (risk-adjusted returns)
-  - Value at Risk (VaR 95%)
-  - Annualized volatility
-- **Adaptive Algorithms** - Context-aware risk scoring with weighted factors
-- **Optimized Performance** - 60s cache for fresh data, 1d candle standardization for accuracy
-- **Responsive UI** - Beautiful dark-mode dashboard with Tailwind CSS & Recharts
-- **20 Cryptocurrencies** - Bitcoin, Ethereum, Tether, XRP, BNB, Solana, USDC, TRON, Dogecoin, Cardano, Avalanche, Chainlink, Shiba Inu, Bitcoin Cash, Stellar, Polkadot, Litecoin, Uniswap, Wrapped Bitcoin, Dai
-
-## Architecture
-
-```
-CryptoRiskAnalysis/
-├── CryptoRiskAnalysis.API/    # .NET 8 Backend
-│   ├── Controllers/            # API endpoints
-│   ├── Services/              # Hybrid Data & Risk Logic
-│   ├── Models/                # Data models
-│   ├── DTOs/                  # Data transfer objects
-│   └── Wrappers/              # Standard API Responses
-│
-└── client/                    # React Frontend
-    ├── src/
-    │   ├── components/        # UI components
-    │   ├── services/          # API integration
-    │   └── constants/         # Asset definitions
-    └── public/
-```
-
-## Tech Stack
-
-### Backend
-- **.NET 8.0** - Web API
-- **C# 12** - Language
-- **ASP.NET Core** - Framework
-- **IMemoryCache** - Hybrid Caching
-- **HttpClient** - API calls
-
-### Frontend
-- **React 19.2** - UI framework
-- **TypeScript 5.9** - Type safety
-- **Vite 7.2** - Build tool
-- **Tailwind CSS 3** - Styling
-- **Axios 1.13** - HTTP client
-- **Recharts 3.5** - Charts
-
-### External APIs
-- **Binance Spot API** - Primary data source (High limits, 1-min cache)
-- **CoinGecko API** - Fallback data source (Broad coverage, 3-min cache)
-
-## Risk Calculation
-
-### Core Risk Scores (0-100 scale)
-
-1. **Volatility Score** (40% weight)
-   - **Log returns** for mathematical accuracy
-   - Annualized standard deviation (Daily Candles)
-   - Industry-standard financial metric
-   - Formula: `σ_annual = σ_daily × √365`
-
-2. **Trend Score** (30% weight)
-   - 7-day vs 30-day momentum analysis
-   - Extreme movement detection (both directions = risk)
-   - Absolute value approach
-   - Detects pump & dump patterns
-
-3. **Volume Score** (30% weight)
-   - Context-aware volume analysis
-   - Uses **Last Completed Daily Candle** for accuracy
-   - Price-volume divergence detection
-   - Liquidity risk assessment
-
-4. **Composite Score**
-   - Adaptive weighting based on market conditions
-   - Risk amplification when multiple factors align
-   - Risk dampening for stable conditions
-
-### Advanced Financial Metrics
-
-5. **Downside Risk**
-   - Volatility of negative returns only
-   - Focuses on loss scenarios
-   - Formula: `σ_downside = √(Σ(min(r_i, 0))² / (n-1))`
-
-6. **Maximum Drawdown**
-   - Largest peak-to-trough decline (%)
-   - Key metric for worst-case scenarios
-   - Formula: `MDD = max(1 - P_t / max(P_0...P_t))`
-
-7. **Sharpe Ratio**
-   - Risk-adjusted return metric (annualized)
-   - Higher values indicate better risk/return profile
-   - Formula: `Sharpe = (μ - r_f) / σ × √365`
-   - Uses 0% risk-free rate for crypto
-
-8. **Value at Risk (VaR 95%)**
-   - Worst-case loss at 95% confidence
-   - 5th percentile of return distribution
-   - Annualized percentage format
-
-9. **Annualized Volatility**
-   - Raw volatility as percentage
-   - Standard deviation × √365 × 100
-
-## Performance
-
-- **Hybrid Engine**: Automatically routes requests to Binance/CoinGecko
-- **Cache Optimization**: 60s for Binance, 3m for CoinGecko
-- **Response Time**: < 100ms (cached), < 1s (API call)
-- **Calculation Accuracy**: ~98% with daily candle standardization
-- **Metric Coverage**: 9 comprehensive risk indicators
-- **Time Range Options**: 7D, 30D, 90D analysis periods
-
-## Documentation
-
-- [Backend Setup](./CryptoRiskAnalysis.API/README.md)
-- [Frontend Setup](./client/README.md)
-- [Risk Formula Analysis](./docs/risk-formulas.md)
-- [Performance Optimization](./docs/optimization.md)
-
-## Environment Variables
-
-No API keys required for standard usage (Public Endpoints).
-
-## Known Issues
-
-- **Rate Limits**: Hybrid engine minimizes impact, but CoinGecko fallback (free tier) has ~10-50 calls/minute.
-- **Binance IP Bans**: Excessive requests without caching could trigger temporary IP bans (auto-mitigated by our 60s cache).
-- **CORS**: Backend must run on port 5058, frontend on 5173
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-MIT License - see [LICENSE](LICENSE) file for details
-
-## Author
-
-**Mayıs Kuru**
-- GitHub: [@maykk159](https://github.com/maykk159)
-
-## Acknowledgments
-
-- [Binance](https://www.binance.com/) for high-performance Spot Data
-- [CoinGecko](https://www.coingecko.com/) for extensive asset metadata
-- Clean Architecture principles
-- Financial risk calculation standards
-
-## Support
-
-For issues and questions:
-- Open an [Issue](https://github.com/maykk159/CryptoRiskProject/issues)
-- Check [Discussions](https://github.com/maykk159/CryptoRiskProject/discussions)
+Built with **.NET 8 Clean Architecture** and a responsive **React/TypeScript** frontend, the platform ensures low-latency calculations and a premium user experience.
 
 ---
 
-⭐ Star this repo if you find it helpful!
+## ✨ Key Features
+
+### 🛡️ Hybrid Data Engine
+- **Smart Routing**: Intelligently routes data requests to the Binance Spot API for high-frequency assets (1-min cache) and falls back to CoinGecko for long-tail markets (3-min cache).
+- **Resiliency**: Built-in circuit breakers and automatic failover mechanisms ensure continuous operation even during API outages.
+
+### 📊 Advanced Risk Metrics
+- **Volatility Analysis**: Log-returns based annualized volatility calculation for precise risk measurement.
+- **Institutional Indicators**:
+  - **VaR (95%)**: Value at Risk estimation for downside protection.
+  - **Sharpe Ratio**: Risk-adjusted return performance evaluation.
+  - **Max Drawdown**: Historical worst-case loss tracking.
+  - **Downside Risk**: Focuses exclusively on negative return variance.
+
+### ⚡ High-Performance Architecture
+- **Optimized Backend**: Parallel processing and in-memory caching for sub-100ms response times.
+- **Modern Frontend**: Interactive visualizations powered by Recharts and Tailwind CSS.
+- **Asset Coverage**: Support for top 20 cryptocurrencies including Bitcoin (BTC), Ethereum (ETH), Solana (SOL), and more.
+
+---
+
+## 🛠️ Technology Stack
+
+| Component | Technology | Description |
+|-----------|------------|-------------|
+| **Backend** | .NET 8 (C#) | ASP.NET Core Web API, Clean Architecture, Dependency Injection |
+| **Frontend** | React 19, TypeScript | Vite, Tailwind CSS, Recharts, Axios |
+| **Data Layer** | Hybrid Service | Binance API (Primary) + CoinGecko API (Fallback) |
+| **Caching** | IMemoryCache | In-memory distributed caching strategy |
+| **Testing** | xUnit / Jest | Comprehensive unit and integration testing capabilities |
+
+---
+
+## 🚀 Getting Started
+
+### Prerequisites
+- [.NET 8.0 SDK](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Node.js 18+](https://nodejs.org/)
+
+> **💡 Quick Setup**: Use our [Setup Script](REQUIREMENTS.md) for dependencies.
+
+### Installation & Execution
+
+#### 1. Clone the Repository
+```powershell
+git clone https://github.com/maykk159/CryptoRiskProject.git
+cd CryptoRiskProject
+```
+
+#### 2. Run Backend API
+```powershell
+cd CryptoRiskAnalysis.API
+dotnet restore
+dotnet run --project CryptoRiskAnalysis.API/CryptoRiskAnalysis.API.csproj
+# API will be available at http://localhost:5058
+```
+
+#### 3. Run Frontend Application
+```powershell
+# Open a new terminal
+cd client
+npm install
+npm run dev
+# Application will launch at http://localhost:5173
+```
+
+---
+
+## 📐 Risk Calculation Methodology
+
+The platform employs industry-standard financial models adapted for the crypto market.
+
+### Core Scoring (0-100 Scale)
+
+1.  **Volatility Score (40%)**: Derived from annualized standard deviation of daily log returns.
+    -   Formula: `σ_annual = σ_daily × √365`
+2.  **Trend Score (30%)**: Momentum analysis comparing 7-day vs 30-day moving averages to detect extreme deviations.
+3.  **Volume Score (30%)**: Liquidity risk assessment based on volume-to-price divergence analysis.
+
+### Advanced Metrics
+
+-   **Sharpe Ratio**: `(μ - r_f) / σ × √365` (using 0% risk-free rate)
+-   **Downside Risk**: `√(Σ(min(r_i, 0))² / (n-1))` (Semideviation)
+-   **Maximum Drawdown**: `MDD = max(1 - P_t / max(P_0...P_t))`
+-   **Value at Risk (VaR 95%)**: 5th percentile of return distribution (Historical Simulation)
+
+---
+
+## 📂 Project Structure
+
+```
+CryptoRiskAnalysis/
+├── CryptoRiskAnalysis.API/    # .NET 8 Backend Solution
+│   ├── Controllers/           # REST API Endpoints
+│   ├── Services/              # Business Logic & Data Services
+│   ├── Models/                # Domain Entities
+│   ├── DTOs/                  # Data Transfer Objects
+│   └── Middleware/            # Exception Handling & Logging
+│
+└── client/                    # React Frontend Application
+    ├── src/
+    │   ├── components/        # Reusable UI Components
+    │   ├── services/          # API Client Layer
+    │   └── constants/         # Static Configuration
+    └── public/                # Static Assets
+```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please follow the [Contribution Guidelines](CONTRIBUTING.md).
+
+1.  Fork the repository
+2.  Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
+
+---
+
+## 📜 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 👤 Author
+
+**Mayıs Kuru**
+-   GitHub: [@maykk159](https://github.com/maykk159)
+-   Project Link: [https://github.com/maykk159/CryptoRiskProject](https://github.com/maykk159/CryptoRiskProject)
+
+---
+
+> ⭐ If you find this project useful, please consider giving it a star on GitHub!

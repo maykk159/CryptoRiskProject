@@ -8,7 +8,7 @@ interface PriceChartProps {
 }
 
 export const PriceChart: React.FC<PriceChartProps> = ({ data, timeRange }) => {
-    const formattedData = data.map(d => {
+    const formattedData = React.useMemo(() => data.map(d => {
         const dateObj = new Date(d.timestamp);
         return {
             ...d,
@@ -16,7 +16,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, timeRange }) => {
             day: dateObj.getDate(), // robust day extraction
             fullDate: dateObj // keep object if needed
         };
-    });
+    }), [data]);
 
     return (
         <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700 min-h-[500px]">

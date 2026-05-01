@@ -11,6 +11,22 @@ namespace CryptoRiskAnalysis.API.DTOs
         public decimal VolatilityScore { get; set; }
         public decimal TrendScore { get; set; }
         public decimal VolumeScore { get; set; }
+        public RiskAnalysisResponseDto() { }
+
+        public RiskAnalysisResponseDto(string assetId, RiskScoreResult riskResult)
+        {
+            AssetId = assetId;
+            CompositeRiskScore = riskResult.CompositeRiskScore;
+            VolatilityScore = riskResult.VolatilityScore;
+            TrendScore = riskResult.TrendScore;
+            VolumeScore = riskResult.VolumeScore;
+            DownsideRisk = riskResult.DownsideRisk;
+            MaxDrawdown = riskResult.MaxDrawdown;
+            SharpeRatio = riskResult.SharpeRatio;
+            ValueAtRisk95 = riskResult.ValueAtRisk95;
+            AnnualizedVolatility = riskResult.AnnualizedVolatility;
+            PriceHistory = riskResult.PriceHistory;
+        }
         
         // ✨ NEW: Advanced financial metrics
         public decimal DownsideRisk { get; set; }
