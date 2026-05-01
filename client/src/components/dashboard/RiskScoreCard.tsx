@@ -10,23 +10,23 @@ function useAnimatedNumber(target: number, duration: number = 800, delay: number
         let animationFrameId: number;
         let timeoutId: number;
 
-        const startValue = 0; 
+        const startValue = 0;
         const easeOut = (t: number) => 1 - Math.pow(1 - t, 3); // Cubic ease-out
 
         const animate = (currentTime: number) => {
             if (!startTime) startTime = currentTime;
             const elapsed = currentTime - startTime;
             const progress = Math.min(elapsed / duration, 1);
-            
+
             const easedProgress = easeOut(progress);
             const currentVal = startValue + (target - startValue) * easedProgress;
-            
+
             setValue(currentVal);
 
             if (progress < 1) {
                 animationFrameId = requestAnimationFrame(animate);
             } else {
-                setValue(target); 
+                setValue(target);
             }
         };
 
@@ -44,6 +44,36 @@ function useAnimatedNumber(target: number, duration: number = 800, delay: number
 
     return value;
 }
+
+const RiskGauge: React.FC<{ score: number }> = ({ score }) => {
+    // 1000ms for the upper gauge
+    const animatedScore = useAnimatedNumber(score, 1000);
+    // Map 0-100 to -90 to 90 degrees rotation
+    const rotation = (animatedScore / 100) * 180 - 90;
+
+    return (
+        <div className="relative w-36 h-20 flex items-end justify-center">
+            <svg viewBox="0 0 100 55" className="absolute bottom-0 w-full h-full overflow-visible drop-shadow-md">
+                {/* Track Background */}
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#374151" strokeWidth="10" />
+
+                {/* 5 Colored Segments */}
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#22c55e" strokeWidth="10" strokeDasharray="23.5 105" strokeDashoffset="0" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#a3e635" strokeWidth="10" strokeDasharray="23.5 105" strokeDashoffset="-25.54" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#facc15" strokeWidth="10" strokeDasharray="23.5 105" strokeDashoffset="-51.08" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#fb923c" strokeWidth="10" strokeDasharray="23.5 105" strokeDashoffset="-76.62" />
+                <path d="M 10 50 A 40 40 0 0 1 90 50" fill="none" stroke="#ef4444" strokeWidth="10" strokeDasharray="23.5 105" strokeDashoffset="-102.16" />
+
+                {/* Needle */}
+                <g style={{ transform: `rotate(${rotation}deg)`, transformOrigin: '50px 50px' }}>
+                    <polygon points="48.5,50 51.5,50 50,14" fill="#f3f4f6" />
+                    <circle cx="50" cy="50" r="4" fill="#f3f4f6" />
+                    <circle cx="50" cy="50" r="1.5" fill="#1f2937" />
+                </g>
+            </svg>
+        </div>
+    );
+};
 
 interface RiskScoreCardProps {
     data: {
@@ -65,21 +95,21 @@ const colorClasses = {
     orange: { iconBg: 'bg-orange-500/20', iconText: 'text-orange-400', barFill: 'bg-orange-500', barThumb: 'bg-orange-400', text: 'text-orange-400' },
 };
 
-const ScoreBar: React.FC<{ 
-    label: string; 
-    description: string; 
-    score: number; 
-    colorKey: keyof typeof colorClasses; 
+const ScoreBar: React.FC<{
+    label: string;
+    description: string;
+    score: number;
+    colorKey: keyof typeof colorClasses;
     icon: React.ReactNode;
     delayMs?: number;
 }> = ({ label, description, score, colorKey, icon, delayMs = 0 }) => {
     const [animatedWidth, setAnimatedWidth] = React.useState(0);
-    const animatedScore = useAnimatedNumber(score, 800, delayMs);
+    const animatedScore = useAnimatedNumber(score, 2000, delayMs);
 
     React.useEffect(() => {
         // Reset to 0 when the score (and thus selected asset) changes
         setAnimatedWidth(0);
-        
+
         // Trigger CSS transition after a short delay (including stagger)
         const timer = setTimeout(() => {
             setAnimatedWidth(score);
@@ -114,7 +144,7 @@ const ScoreBar: React.FC<{
             <div className="flex-[2] hidden md:block mx-6">
                 <div className="w-full bg-gray-700/50 rounded-full h-3">
                     <div
-                        className={clsx("h-3 rounded-full relative transition-all duration-[800ms] ease-out", theme.barFill)}
+                        className={clsx("h-3 rounded-full relative transition-all duration-[2000ms] ease-out", theme.barFill)}
                         style={{ width: `${Math.min(100, Math.max(0, animatedWidth))}%` }}
                     >
                         <div className={clsx("absolute right-0 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full shadow-md", theme.barThumb)}></div>
@@ -168,39 +198,46 @@ export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset }) => 
             </div>
 
             <div className="flex items-center justify-between mb-8 p-5 bg-gray-900 rounded-xl">
-                <div>
+                <div className="w-1/3">
                     <p className="text-gray-400 text-sm mb-1">Composite Risk Score</p>
                     <p className={`text-4xl font-bold ${riskLevel.color}`}>
-                        {data.compositeRiskScore.toFixed(1)}
+                        {useAnimatedNumber(data.compositeRiskScore, 1000).toFixed(1)}
                     </p>
                 </div>
-                <div className={`text-lg font-semibold px-5 py-2.5 rounded-full ${riskLevel.color.replace('text-', 'bg-')} bg-opacity-20`}>
-                    {riskLevel.text}
+
+                <div className="w-1/3 flex justify-center hidden sm:flex">
+                    <RiskGauge score={data.compositeRiskScore} />
+                </div>
+
+                <div className="w-1/3 flex justify-end">
+                    <div className={`text-lg font-semibold px-5 py-2.5 rounded-full ${riskLevel.color.replace('text-', 'bg-')} bg-opacity-20`}>
+                        {riskLevel.text}
+                    </div>
                 </div>
             </div>
 
             <div className="space-y-5">
-                <ScoreBar 
-                    label="Volatility Risk" 
+                <ScoreBar
+                    label="Volatility Risk"
                     description="Price fluctuation and volatility analysis"
-                    score={data.volatilityScore} 
-                    colorKey="purple" 
+                    score={data.volatilityScore}
+                    colorKey="purple"
                     icon={<Activity size={24} />}
                     delayMs={0}
                 />
-                <ScoreBar 
-                    label="Trend Risk" 
+                <ScoreBar
+                    label="Trend Risk"
                     description="Market trend and momentum analysis"
-                    score={data.trendScore} 
-                    colorKey="blue" 
+                    score={data.trendScore}
+                    colorKey="blue"
                     icon={<TrendingUp size={24} />}
                     delayMs={150}
                 />
-                <ScoreBar 
-                    label="Volume Risk" 
+                <ScoreBar
+                    label="Volume Risk"
                     description="Trading volume and liquidity analysis"
-                    score={data.volumeScore} 
-                    colorKey="orange" 
+                    score={data.volumeScore}
+                    colorKey="orange"
                     icon={<BarChart2 size={24} />}
                     delayMs={300}
                 />

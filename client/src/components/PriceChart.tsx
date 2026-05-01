@@ -12,7 +12,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, timeRange }) => {
         const dateObj = new Date(d.timestamp);
         return {
             ...d,
-            date: dateObj.toLocaleDateString(), // Keep full date for tooltip or reference
+            date: dateObj.toLocaleDateString('en-US'), // Keep full date for tooltip or reference
             day: dateObj.getDate(), // robust day extraction
             fullDate: dateObj // keep object if needed
         };
@@ -38,13 +38,13 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, timeRange }) => {
                         stroke="#9CA3AF"
                         tick={{ fill: '#9CA3AF' }}
                         domain={['auto', 'auto']}
-                        tickFormatter={(value) => `$${value.toLocaleString()}`}
+                        tickFormatter={(value) => `$${value.toLocaleString('en-US')}`}
                     />
                     <Tooltip
                         contentStyle={{ backgroundColor: '#1F2937', borderColor: '#374151', color: '#F3F4F6' }}
                         itemStyle={{ color: '#60A5FA' }}
-                        formatter={(value: number) => [`$${value.toLocaleString()}`, 'Price']}
-                        labelFormatter={(label) => new Date(label).toLocaleDateString(undefined, {
+                        formatter={(value: number) => [`$${value.toLocaleString('en-US')}`, 'Price']}
+                        labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', {
                             weekday: 'short',
                             year: 'numeric',
                             month: 'short',
@@ -58,6 +58,7 @@ export const PriceChart: React.FC<PriceChartProps> = ({ data, timeRange }) => {
                         strokeWidth={2}
                         dot={false}
                         activeDot={{ r: 8 }}
+                        animationDuration={3000}
                     />
                 </LineChart>
             </ResponsiveContainer>
