@@ -1,4 +1,49 @@
 import React from 'react';
+import clsx from 'clsx';
+import { Activity, TrendingUp, BarChart2 } from 'lucide-react';
+
+function useAnimatedNumber(target: number, duration: number = 800, delay: number = 0) {
+    const [value, setValue] = React.useState(0);
+
+    React.useEffect(() => {
+        let startTime: number | null = null;
+        let animationFrameId: number;
+        let timeoutId: number;
+
+        const startValue = 0; 
+        const easeOut = (t: number) => 1 - Math.pow(1 - t, 3); // Cubic ease-out
+
+        const animate = (currentTime: number) => {
+            if (!startTime) startTime = currentTime;
+            const elapsed = currentTime - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            
+            const easedProgress = easeOut(progress);
+            const currentVal = startValue + (target - startValue) * easedProgress;
+            
+            setValue(currentVal);
+
+            if (progress < 1) {
+                animationFrameId = requestAnimationFrame(animate);
+            } else {
+                setValue(target); 
+            }
+        };
+
+        setValue(0); // Reset immediately
+
+        timeoutId = window.setTimeout(() => {
+            animationFrameId = requestAnimationFrame(animate);
+        }, delay + 50);
+
+        return () => {
+            clearTimeout(timeoutId);
+            if (animationFrameId) cancelAnimationFrame(animationFrameId);
+        };
+    }, [target, duration, delay]);
+
+    return value;
+}
 
 interface RiskScoreCardProps {
     data: {
@@ -14,6 +59,80 @@ interface RiskScoreCardProps {
     };
 }
 
+const colorClasses = {
+    purple: { iconBg: 'bg-purple-500/20', iconText: 'text-purple-400', barFill: 'bg-purple-500', barThumb: 'bg-purple-400', text: 'text-purple-400' },
+    blue: { iconBg: 'bg-blue-500/20', iconText: 'text-blue-400', barFill: 'bg-blue-500', barThumb: 'bg-blue-400', text: 'text-blue-400' },
+    orange: { iconBg: 'bg-orange-500/20', iconText: 'text-orange-400', barFill: 'bg-orange-500', barThumb: 'bg-orange-400', text: 'text-orange-400' },
+};
+
+const ScoreBar: React.FC<{ 
+    label: string; 
+    description: string; 
+    score: number; 
+    colorKey: keyof typeof colorClasses; 
+    icon: React.ReactNode;
+    delayMs?: number;
+}> = ({ label, description, score, colorKey, icon, delayMs = 0 }) => {
+    const [animatedWidth, setAnimatedWidth] = React.useState(0);
+    const animatedScore = useAnimatedNumber(score, 800, delayMs);
+
+    React.useEffect(() => {
+        // Reset to 0 when the score (and thus selected asset) changes
+        setAnimatedWidth(0);
+        
+        // Trigger CSS transition after a short delay (including stagger)
+        const timer = setTimeout(() => {
+            setAnimatedWidth(score);
+        }, 50 + delayMs);
+
+        return () => clearTimeout(timer);
+    }, [score, delayMs]);
+
+    const getLevelText = (s: number) => {
+        if (s < 30) return 'Low';
+        if (s < 70) return 'Medium';
+        return 'High';
+    };
+
+    const levelText = getLevelText(score);
+    const theme = colorClasses[colorKey];
+
+    return (
+        <div className="flex items-center gap-5 bg-gray-900/40 p-5 rounded-2xl border border-gray-700/50">
+            {/* Icon */}
+            <div className={clsx("p-3.5 rounded-xl shrink-0", theme.iconBg, theme.iconText)}>
+                {icon}
+            </div>
+
+            {/* Texts */}
+            <div className="flex-1 min-w-[160px]">
+                <p className="text-white font-semibold text-base">{label}</p>
+                <p className="text-gray-400 text-sm mt-1">{description}</p>
+            </div>
+
+            {/* Progress Bar */}
+            <div className="flex-[2] hidden md:block mx-6">
+                <div className="w-full bg-gray-700/50 rounded-full h-3">
+                    <div
+                        className={clsx("h-3 rounded-full relative transition-all duration-[800ms] ease-out", theme.barFill)}
+                        style={{ width: `${Math.min(100, Math.max(0, animatedWidth))}%` }}
+                    >
+                        <div className={clsx("absolute right-0 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full shadow-md", theme.barThumb)}></div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Score & Badge */}
+            <div className="text-right shrink-0 min-w-[70px] flex flex-col items-end gap-1.5">
+                <span className={clsx("text-2xl font-bold leading-none", theme.text)}>{animatedScore.toFixed(1)}</span>
+                <span className={clsx("text-xs font-semibold px-3 py-1 rounded-full", theme.iconBg, theme.text)}>
+                    {levelText}
+                </span>
+            </div>
+        </div>
+    );
+};
+
 export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset }) => {
     const getRiskLevel = (score: number) => {
         if (score < 30) return { text: 'Low Risk', color: 'text-green-400', bgColor: 'bg-green-400' };
@@ -24,17 +143,23 @@ export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset }) => 
     const riskLevel = getRiskLevel(data.compositeRiskScore);
 
     return (
-        <div className="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-700">
+        <div className="bg-gray-800 rounded-2xl p-7 shadow-lg border border-gray-700">
             <div className="flex items-center gap-4 mb-6">
                 {asset && (
-                    <img
-                        src={asset.icon}
-                        alt={asset.name}
-                        className="w-10 h-10 rounded-full"
-                        onError={(e) => {
-                            (e.target as HTMLImageElement).style.display = 'none'; // Hide if fails
-                        }}
-                    />
+                    <div className="relative w-12 h-12 shrink-0">
+                        <img
+                            src={asset.icon}
+                            alt={asset.name}
+                            className="w-12 h-12 rounded-full object-contain bg-white p-1"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none'; // Hide if fails
+                                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                            }}
+                        />
+                        <div className="w-12 h-12 rounded-full bg-gray-700 flex items-center justify-center text-lg font-bold text-gray-300 hidden absolute inset-0 border-2 border-gray-600">
+                            {asset.ticker.substring(0, 2)}
+                        </div>
+                    </div>
                 )}
                 <h2 className="text-xl font-bold text-white">
                     {asset ? asset.name : 'Risk Analysis'}
@@ -42,60 +167,43 @@ export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset }) => 
                 </h2>
             </div>
 
-            <div className="flex items-center justify-between mb-8 p-4 bg-gray-900 rounded-lg">
+            <div className="flex items-center justify-between mb-8 p-5 bg-gray-900 rounded-xl">
                 <div>
-                    <p className="text-gray-400 text-sm">Composite Risk Score</p>
-                    <p className={`text-3xl font-bold ${riskLevel.color}`}>
+                    <p className="text-gray-400 text-sm mb-1">Composite Risk Score</p>
+                    <p className={`text-4xl font-bold ${riskLevel.color}`}>
                         {data.compositeRiskScore.toFixed(1)}
                     </p>
                 </div>
-                <div className={`text-lg font-semibold px-4 py-2 rounded-full ${riskLevel.color}`}>
+                <div className={`text-lg font-semibold px-5 py-2.5 rounded-full ${riskLevel.color.replace('text-', 'bg-')} bg-opacity-20`}>
                     {riskLevel.text}
                 </div>
             </div>
 
-            <div className="space-y-6">
-                {/* Volatility Score */}
-                <div className="mb-4">
-                    <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-300">Volatility Risk</span>
-                        <span className="text-sm font-medium text-white">{data.volatilityScore.toFixed(1)}</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                        <div
-                            className="h-2.5 rounded-full bg-purple-500"
-                            style={{ width: `${Math.min(100, Math.max(0, data.volatilityScore))}%` }}
-                        ></div>
-                    </div>
-                </div>
-
-                {/* Trend Score */}
-                <div className="mb-4">
-                    <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-300">Trend Risk</span>
-                        <span className="text-sm font-medium text-white">{data.trendScore.toFixed(1)}</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                        <div
-                            className="h-2.5 rounded-full bg-blue-500"
-                            style={{ width: `${Math.min(100, Math.max(0, data.trendScore))}%` }}
-                        ></div>
-                    </div>
-                </div>
-
-                {/* Volume Score */}
-                <div className="mb-4">
-                    <div className="flex justify-between mb-1">
-                        <span className="text-sm font-medium text-gray-300">Volume Risk</span>
-                        <span className="text-sm font-medium text-white">{data.volumeScore.toFixed(1)}</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-2.5">
-                        <div
-                            className="h-2.5 rounded-full bg-orange-500"
-                            style={{ width: `${Math.min(100, Math.max(0, data.volumeScore))}%` }}
-                        ></div>
-                    </div>
-                </div>
+            <div className="space-y-5">
+                <ScoreBar 
+                    label="Volatility Risk" 
+                    description="Price fluctuation and volatility analysis"
+                    score={data.volatilityScore} 
+                    colorKey="purple" 
+                    icon={<Activity size={24} />}
+                    delayMs={0}
+                />
+                <ScoreBar 
+                    label="Trend Risk" 
+                    description="Market trend and momentum analysis"
+                    score={data.trendScore} 
+                    colorKey="blue" 
+                    icon={<TrendingUp size={24} />}
+                    delayMs={150}
+                />
+                <ScoreBar 
+                    label="Volume Risk" 
+                    description="Trading volume and liquidity analysis"
+                    score={data.volumeScore} 
+                    colorKey="orange" 
+                    icon={<BarChart2 size={24} />}
+                    delayMs={300}
+                />
             </div>
         </div>
     );
