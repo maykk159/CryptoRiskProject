@@ -5,6 +5,12 @@ namespace CryptoRiskAnalysis.API.Services
 {
     public class RiskAnalysisEngine : IRiskEngine
     {
+        private readonly ILogger<RiskAnalysisEngine> _logger;
+
+        public RiskAnalysisEngine(ILogger<RiskAnalysisEngine> logger)
+        {
+            _logger = logger;
+        }
         // Risk calculation constants
         private const decimal EXTREME_MOMENTUM_THRESHOLD = 0.30m;  // 30% movement
         private const decimal SIGNIFICANT_MOMENTUM_THRESHOLD = 0.15m;  // 15% movement
@@ -54,11 +60,9 @@ namespace CryptoRiskAnalysis.API.Services
             var annualizedVol = CalculateAnnualizedVolatility(returns);
 
 
-            // DEBUG LOGGING
-            Console.WriteLine($"[RISK DEBUG] Volatility: DailyStdDev={CalculateStdDev(returns):F4}, Annualized={(decimal)CalculateStdDev(returns) * (decimal)Math.Sqrt(365) * 100:F2}% -> Score={volatilityScore}");
-            Console.WriteLine($"[RISK DEBUG] Trend: Momentum={(CalculateTrendScore(prices) == 50 ? "N/A" : "Checked")}, RawTrendScore={trendScore}");
-            Console.WriteLine($"[RISK DEBUG] Volume: Current={currentVolume}, Avg={averageVolume}, Ratio={currentVolume/averageVolume:F2} -> Score={volumeScore}");
-            Console.WriteLine($"[RISK DEBUG] Composite: {compositeScore} (Amplified?)");
+            _logger.LogDebug(
+                "Risk scores — Volatility: {VScore:F2}, Trend: {TScore:F2}, Volume: {VolScore:F2}, Composite: {CScore:F2}",
+                volatilityScore, trendScore, volumeScore, compositeScore);
             
             return new RiskScoreResult
             {
