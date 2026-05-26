@@ -22,179 +22,100 @@ namespace CryptoRiskAnalysis.API.Services
         }
 
         /// <summary>
-        /// Fetches price history and volume data from Binance klines endpoint
+        /// Fetches price history and volume data from Binance klines endpoint.
+        /// HTTP retries (on 5xx and 429) are handled automatically by the Polly policy
+        /// configured in ServiceCollectionExtensions — no manual retry loop needed here.
         /// </summary>
         public async Task<(List<PriceData> priceHistory, decimal currentVolume, decimal avgVolume)> GetAllMarketDataAsync(string assetId, int days)
         {
             // 1. Map CoinGecko ID to Binance symbol
             var symbol = BinanceSymbolMapper.GetBinanceSymbol(assetId);
             if (symbol == null)
-            {
                 throw new Exception($"Asset '{assetId}' not available on Binance");
-            }
 
             // 2. Check cache first (1-minute cache for fresh data)
             string cacheKey = $"binance_{symbol}_{days}";
             if (_cache.TryGetValue(cacheKey, out (List<PriceData>, decimal, decimal) cachedData))
             {
-                _logger.LogDebug("Binance Cache HIT for {AssetId} ({Symbol}) - returning cached data", assetId, symbol);
+                _logger.LogDebug("Binance Cache HIT for {AssetId} ({Symbol})", assetId, symbol);
                 return cachedData;
             }
 
-            _logger.LogInformation("Binance Cache MISS for {AssetId} ({Symbol}) - fetching from Binance API", assetId, symbol);
+            _logger.LogInformation("Binance Cache MISS for {AssetId} ({Symbol}) — fetching from API", assetId, symbol);
 
             // 3. Determine interval and limit based on time range
             var (interval, limit) = GetKlineParams(days);
+            var url = $"{BaseUrl}/klines?symbol={symbol}&interval={interval}&limit={limit}";
 
-            int maxRetries = 3;
-            int baseRetryDelay = 1000; // 1 second base delay
+            // 4. Fetch — Polly retries on transient errors and 429 automatically
+            var response = await _httpClient.GetAsync(url);
+            response.EnsureSuccessStatusCode();
 
-            for (int attempt = 0; attempt < maxRetries; attempt++)
+            var content = await response.Content.ReadAsStringAsync();
+            var klines = JsonSerializer.Deserialize<List<List<JsonElement>>>(content);
+
+            if (klines == null || klines.Count == 0)
+                throw new Exception($"No kline data returned for {symbol}");
+
+            // 5. Parse klines into PriceData
+            // Binance returns: [timestamp(number), open(string), high(string), low(string), close(string), volume(string), ...]
+            var priceHistory = klines.Select(k => new PriceData
             {
-                try
-                {
-                    if (attempt > 0)
-                    {
-                        int delay = baseRetryDelay * (attempt + 1);
-                        _logger.LogWarning("Binance retry {Attempt}, waiting {Delay}ms for {Symbol}", attempt + 1, delay, symbol);
-                        await Task.Delay(delay);
-                    }
+                // Timestamp is a number
+                Timestamp = k[0].ValueKind == JsonValueKind.Number
+                    ? k[0].GetInt64()
+                    : long.Parse(k[0].GetString()!),
+                // Close price is index 4 — use InvariantCulture to handle decimal points correctly
+                Price = k[4].ValueKind == JsonValueKind.String
+                    ? decimal.Parse(k[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                    : k[4].GetDecimal()
+            }).OrderBy(p => p.Timestamp).ToList();
 
-                    // 4. Fetch klines from Binance
-                    var url = $"{BaseUrl}/klines?symbol={symbol}&interval={interval}&limit={limit}";
-                    var response = await _httpClient.GetAsync(url);
+            // 6. Calculate volume metrics (volume is at index 5)
+            // Use the last COMPLETED candle (index ^2) — not the live candle which starts at 0.
+            var volumes = klines.Select(k =>
+                k[5].ValueKind == JsonValueKind.String
+                    ? decimal.Parse(k[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
+                    : k[5].GetDecimal()
+            ).ToList();
 
-                    if (response.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
-                    {
-                        _logger.LogWarning("Binance rate limit hit for {Symbol}, attempt {Attempt}/{MaxRetries}", symbol, attempt + 1, maxRetries);
-                        if (attempt < maxRetries - 1) continue;
-                        throw new Exception("Binance rate limit exceeded");
-                    }
+            decimal currentVolume;
+            decimal avgVolume;
 
-                    response.EnsureSuccessStatusCode();
-
-                    var content = await response.Content.ReadAsStringAsync();
-                    var klines = JsonSerializer.Deserialize<List<List<JsonElement>>>(content);
-
-                    if (klines == null || !klines.Any())
-                    {
-                        throw new Exception($"No kline data returned for {symbol}");
-                    }
-
-                    // DEBUG: Log first kline to verify structure and types
-                    if (klines.Count > 0 && _logger.IsEnabled(LogLevel.Debug))
-                    {
-                        var firstKline = klines[0];
-                        _logger.LogDebug("First kline has {Count} elements", firstKline.Count);
-                        _logger.LogDebug("Element[0] type: {Type}, value: {Value}", firstKline[0].ValueKind, firstKline[0]);
-                        _logger.LogDebug("Element[1] type: {Type}, value: {Value}", firstKline[1].ValueKind, firstKline[1]);
-                        _logger.LogDebug("Element[4] type: {Type}, value: {Value}", firstKline[4].ValueKind, firstKline[4]);
-                        
-                        // Parse and log the first price to debug the issue
-                        var priceString = firstKline[4].ValueKind == JsonValueKind.String 
-                            ? firstKline[4].GetString()! 
-                            : firstKline[4].ToString();
-                        var parsedPrice = decimal.Parse(priceString, System.Globalization.CultureInfo.InvariantCulture);
-                        _logger.LogDebug("Price string: '{PriceString}', Parsed decimal: {ParsedPrice}", priceString, parsedPrice);
-                    }
-
-                    // 5. Parse klines into PriceData
-                    // Binance returns: [timestamp(number), open(string), high(string), low(string), close(string), volume(string), ...]
-                    var priceHistory = klines.Select(k => new PriceData
-                    {
-                        // Timestamp is a number
-                        Timestamp = k[0].ValueKind == JsonValueKind.Number 
-                            ? k[0].GetInt64() 
-                            : long.Parse(k[0].GetString()!),
-                        // Close price is index 4 and is a string - use InvariantCulture to handle decimal points correctly
-                        Price = k[4].ValueKind == JsonValueKind.String
-                            ? decimal.Parse(k[4].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
-                            : k[4].GetDecimal()
-                    }).OrderBy(p => p.Timestamp).ToList();
-
-                    // DEBUG: Data Order Verification
-                    if (priceHistory.Any())
-                    {
-                        var first = priceHistory.First();
-                        var last = priceHistory.Last();
-                        _logger.LogInformation($"[DATA DEBUG] Fetched {priceHistory.Count} records. First: {DateTimeOffset.FromUnixTimeMilliseconds(first.Timestamp)} | Last: {DateTimeOffset.FromUnixTimeMilliseconds(last.Timestamp)}");
-                        
-                        if (first.Timestamp > last.Timestamp)
-                        {
-                            _logger.LogError("CRITICAL: DATA IS REVERSED! NEWEST FIRST! RISK CALCS WILL BE WRONG!");
-                        }
-                    }
-
-                    // 6. Calculate volume metrics (volume is at index 5)
-                    var volumes = klines.Select(k => 
-                        k[5].ValueKind == JsonValueKind.String
-                            ? decimal.Parse(k[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
-                            : k[5].GetDecimal()
-                    ).ToList();
-
-                    // FIX: For "Current Volume" risk analysis, we shouldn't use the LIVE incomplete candle
-                    // because it starts at 0 every day/4h, causing massive "Low Volume" alerts.
-                    // We use the LAST COMPLETED candle (Yesterday/Last Period) for a fair comparison.
-                    
-                    decimal currentVolume;
-                    decimal avgVolume;
-
-                    if (volumes.Count >= 2)
-                    {
-                        // Use the last completed candle (index ^2)
-                        currentVolume = volumes[volumes.Count - 2];
-                        // Average should ideally include the completed candles
-                        avgVolume = volumes.Take(volumes.Count - 1).Average();
-                        
-                        _logger.LogInformation("Volume Analysis for {Symbol}: Last Completed Vol={Vol}, Avg(30d)={Avg}", symbol, currentVolume, avgVolume);
-                    }
-                    else
-                    {
-                        // Fallback if only 1 candle exists
-                        currentVolume = volumes.Last();
-                        avgVolume = currentVolume;
-                    }
-
-                    var result = (priceHistory, currentVolume, avgVolume);
-
-                    // 7. Cache for 1 minute
-                    var cacheOptions = new MemoryCacheEntryOptions()
-                        .SetAbsoluteExpiration(TimeSpan.FromSeconds(CacheDurationSeconds));
-                    _cache.Set(cacheKey, result, cacheOptions);
-
-                    _logger.LogInformation("Binance: Fetched {Count} candles for {AssetId} ({Symbol}) - Cached for {Duration}s", priceHistory.Count, assetId, symbol, CacheDurationSeconds);
-                    return result;
-                }
-                catch (HttpRequestException ex)
-                {
-                    _logger.LogError(ex, "Binance HTTP error for {Symbol} (attempt {Attempt}/{MaxRetries})", symbol, attempt + 1, maxRetries);
-                    if (attempt == maxRetries - 1) throw;
-                }
-                catch (JsonException ex)
-                {
-                    _logger.LogError(ex, "Binance JSON parsing error for {Symbol}", symbol);
-                    throw; // Don't retry JSON errors
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogError(ex, "Binance error for {Symbol} (attempt {Attempt}/{MaxRetries})", symbol, attempt + 1, maxRetries);
-                    if (attempt == maxRetries - 1) throw;
-                }
+            if (volumes.Count >= 2)
+            {
+                currentVolume = volumes[volumes.Count - 2]; // last completed candle
+                avgVolume = volumes.Take(volumes.Count - 1).Average();
+                _logger.LogInformation("Volume for {Symbol}: LastCompleted={Vol:F0}, Avg={Avg:F0}", symbol, currentVolume, avgVolume);
+            }
+            else
+            {
+                currentVolume = volumes.Last();
+                avgVolume = currentVolume;
             }
 
-            throw new Exception($"Failed to fetch data from Binance for {symbol} after {maxRetries} attempts");
+            var result = (priceHistory, currentVolume, avgVolume);
+
+            // 7. Cache for 1 minute
+            _cache.Set(cacheKey, result, new MemoryCacheEntryOptions()
+                .SetAbsoluteExpiration(TimeSpan.FromSeconds(CacheDurationSeconds)));
+
+            _logger.LogInformation("Binance: Fetched {Count} candles for {AssetId} ({Symbol}) — cached for {Duration}s",
+                priceHistory.Count, assetId, symbol, CacheDurationSeconds);
+
+            return result;
         }
 
         /// <summary>
-        /// Determines the optimal kline interval and limit based on time range
-        /// Balances data granularity with API efficiency
+        /// Determines the optimal kline interval and limit based on time range.
+        /// Balances data granularity with API efficiency.
         /// </summary>
-        private (string interval, int limit) GetKlineParams(int days)
+        private static (string interval, int limit) GetKlineParams(int days)
         {
             return days switch
             {
                 7 => ("1d", 7),        // 7 days
-                30 => ("1d", 30),      // 30 days (Standardized to Daily for accurate Vol/Vol calc)
+                30 => ("1d", 30),      // 30 days
                 90 => ("1d", 90),      // 90 days
                 _ => ("1d", days)      // Default: daily candles
             };

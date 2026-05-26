@@ -5,6 +5,12 @@ namespace CryptoRiskAnalysis.API.Services
 {
     public class RiskAnalysisEngine : IRiskEngine
     {
+        private readonly ILogger<RiskAnalysisEngine> _logger;
+
+        public RiskAnalysisEngine(ILogger<RiskAnalysisEngine> logger)
+        {
+            _logger = logger;
+        }
         // Risk calculation constants
         private const decimal EXTREME_MOMENTUM_THRESHOLD = 0.30m;  // 30% movement
         private const decimal SIGNIFICANT_MOMENTUM_THRESHOLD = 0.15m;  // 15% movement
@@ -53,25 +59,10 @@ namespace CryptoRiskAnalysis.API.Services
             var valueAtRisk95 = CalculateValueAtRisk95(returns);
             var annualizedVol = CalculateAnnualizedVolatility(returns);
 
-            return new RiskScoreResult
-            {
-                VolatilityScore = Math.Round(volatilityScore, 2),
-                TrendScore = Math.Round(trendScore, 2),
-                VolumeScore = Math.Round(volumeScore, 2),
-                CompositeRiskScore = Math.Round(compositeScore, 2),
-                DownsideRisk = Math.Round(downsideRisk, 2),
-                MaxDrawdown = Math.Round(maxDrawdown, 2),
-                SharpeRatio = Math.Round(sharpeRatio, 2),
-                ValueAtRisk95 = Math.Round(valueAtRisk95, 2),
-                AnnualizedVolatility = Math.Round(annualizedVol, 2),
-                PriceHistory = priceHistory
-            };
 
-            // DEBUG LOGGING
-            Console.WriteLine($"[RISK DEBUG] Volatility: DailyStdDev={CalculateStdDev(returns):F4}, Annualized={(decimal)CalculateStdDev(returns) * (decimal)Math.Sqrt(365) * 100:F2}% -> Score={volatilityScore}");
-            Console.WriteLine($"[RISK DEBUG] Trend: Momentum={(CalculateTrendScore(prices) == 50 ? "N/A" : "Checked")}, RawTrendScore={trendScore}");
-            Console.WriteLine($"[RISK DEBUG] Volume: Current={currentVolume}, Avg={averageVolume}, Ratio={currentVolume/averageVolume:F2} -> Score={volumeScore}");
-            Console.WriteLine($"[RISK DEBUG] Composite: {compositeScore} (Amplified?)");
+            _logger.LogDebug(
+                "Risk scores — Volatility: {VScore:F2}, Trend: {TScore:F2}, Volume: {VolScore:F2}, Composite: {CScore:F2}",
+                volatilityScore, trendScore, volumeScore, compositeScore);
             
             return new RiskScoreResult
             {

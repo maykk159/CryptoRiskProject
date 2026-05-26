@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { getRiskAnalysis } from '../services/api';
-import type { RiskAnalysisResponse } from '../types';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { getRiskAnalysis, getErrorMessage } from '../services/api';
 import { ASSETS } from '../constants/assets';
 import { TimeRangeSelector } from './dashboard/TimeRangeSelector';
 import { AssetSelector } from './AssetSelector';
@@ -9,89 +9,65 @@ import { AdvancedMetrics } from './dashboard/AdvancedMetrics';
 import { PriceChart } from './PriceChart';
 
 export const Dashboard: React.FC = () => {
-    const [selectedAssetId, setSelectedAssetId] = useState<string>('bitcoin');
-    const selectedAsset = ASSETS.find(a => a.id === selectedAssetId) || ASSETS[0];
-    const [selectedTimeRange, setSelectedTimeRange] = useState<number>(30);
-    const [data, setData] = useState<RiskAnalysisResponse | null>(null);
-    const [loading, setLoading] = useState<boolean>(false);
-    const [error, setError] = useState<string | null>(null);
+  const [selectedAssetId, setSelectedAssetId] = useState<string>('bitcoin');
+  const [selectedTimeRange, setSelectedTimeRange] = useState<number>(30);
 
-    const fetchData = React.useCallback(async () => {
-        setLoading(true);
-        setError(null);
-        try {
-            const result = await getRiskAnalysis(selectedAssetId, selectedTimeRange);
-            setData(result);
-        } catch (err: any) {
-            console.error('API Error:', err);
+  const selectedAsset = ASSETS.find(a => a.id === selectedAssetId) ?? ASSETS[0];
 
-            // Prioritize the error message coming from our API wrapper
-            if (err.message && err.message !== 'Network Error') {
-                setError(err.message);
-            }
-            // Handle Axios specific response errors
-            else if (err.response) {
-                const status = err.response.status;
-                if (status === 429) {
-                    setError('API rate limit exceeded. Please wait a few seconds and try again.');
-                } else if (status === 404) {
-                    setError(`Crypto asset "${selectedAsset.name}" not found. Please select a different asset.`);
-                } else {
-                    setError('Failed to fetch data from the server.');
-                }
-            } else {
-                setError('Failed to connect to the server. Please check your internet connection.');
-            }
-        } finally {
-            setLoading(false);
-        }
-    }, [selectedAssetId, selectedTimeRange, selectedAsset.name]);
+  // Replaces: useEffect + useState(loading) + useState(error) + useState(data) + useCallback + axios
+  // Benefits: automatic cache, deduped requests, background refetch, proper loading/error states
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['risk', selectedAssetId, selectedTimeRange],
+    queryFn: () => getRiskAnalysis(selectedAssetId, selectedTimeRange),
+  });
 
-    useEffect(() => {
-        fetchData();
-    }, [fetchData]);
+  // Type-safe error message — no more catch (err: any)
+  const errorMessage = error ? getErrorMessage(error, selectedAsset.name) : null;
 
-    return (
-        <div className="min-h-screen bg-gray-900 text-white p-8">
-            <div className="max-w-7xl mx-auto">
-                <header className="mb-10">
-                    <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-                        Crypto Risk Analysis
-                    </h1>
-                    <p className="text-gray-400 mt-2">
-                        Advanced financial risk assessment for crypto assets
-                    </p>
-                </header>
+  return (
+    <div className="min-h-screen bg-gray-900 text-white p-8">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-10">
+          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
+            Crypto Risk Analysis
+          </h1>
+          <p className="text-gray-400 mt-2">
+            Advanced financial risk assessment for crypto assets
+          </p>
+        </header>
 
-                {/* Asset Selector */}
-                <AssetSelector
-                    selectedAsset={selectedAssetId}
-                    onSelectAsset={setSelectedAssetId}
-                />
+        {/* Asset Selector */}
+        <AssetSelector
+          selectedAsset={selectedAssetId}
+          onSelectAsset={setSelectedAssetId}
+        />
 
-                {/* Time Range Selector */}
-                <TimeRangeSelector value={selectedTimeRange} onChange={setSelectedTimeRange} />
+        {/* Time Range Selector */}
+        <TimeRangeSelector value={selectedTimeRange} onChange={setSelectedTimeRange} />
 
-                {loading && (
-                    <div className="flex justify-center items-center h-64">
-                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-                    </div>
-                )}
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500" />
+          </div>
+        )}
 
-                {error && (
-                    <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg mb-6">
-                        {error}
-                    </div>
-                )}
+        {/* Error */}
+        {errorMessage && (
+          <div className="bg-red-900/50 border border-red-500 text-red-200 p-4 rounded-lg mb-6">
+            {errorMessage}
+          </div>
+        )}
 
-                {!loading && !error && data && (
-                    <div className="grid grid-cols-1 gap-8">
-                        <RiskScoreCard data={data} asset={selectedAsset} />
-                        <AdvancedMetrics data={data} />
-                        <PriceChart data={data.priceHistory} timeRange={selectedTimeRange} />
-                    </div>
-                )}
-            </div>
-        </div>
-    );
+        {/* Content */}
+        {!isLoading && !errorMessage && data && (
+          <div className="grid grid-cols-1 gap-8">
+            <RiskScoreCard data={data} asset={selectedAsset} />
+            <AdvancedMetrics data={data} />
+            <PriceChart data={data.priceHistory} timeRange={selectedTimeRange} />
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
