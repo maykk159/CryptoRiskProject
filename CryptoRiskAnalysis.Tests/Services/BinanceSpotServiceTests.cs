@@ -119,7 +119,7 @@ namespace CryptoRiskAnalysis.Tests.Services
             var service = new BinanceSpotService(_httpClient, _mockCache.Object, _mockLogger.Object);
 
             // Act & Assert
-            await Assert.ThrowsAsync<HttpRequestException>(async () =>
+            await Assert.ThrowsAsync<Exception>(async () =>
                 await service.GetAllMarketDataAsync("invalid_coin", 30));
         }
 

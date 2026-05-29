@@ -33,8 +33,8 @@ namespace CryptoRiskAnalysis.API.Controllers
             // Validate days parameter - only allow 7, 30, or 90
             if (days != 7 && days != 30 && days != 90)
             {
-                _logger.LogWarning("Invalid days parameter: {Days}. Defaulting to 30.", days);
-                days = 30; // Default to 30 if invalid
+                _logger.LogWarning("Invalid days parameter: {Days}", days);
+                return BadRequest(new ApiResponse<RiskAnalysisResponseDto>("Geçersiz gün parametresi. Yalnızca 7, 30 veya 90 gün kabul edilir."));
             }
 
             // FIX: Always fetch at least 30 days for trend/volatility calculation context

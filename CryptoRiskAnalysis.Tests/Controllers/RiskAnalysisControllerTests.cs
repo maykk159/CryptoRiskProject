@@ -59,10 +59,10 @@ namespace CryptoRiskAnalysis.Tests.Controllers
                 .Returns(riskResult);
 
             // Act
-            var result =await _controller.GetRiskAnalysis(assetId, 30);
+            var result = await _controller.GetRiskAnalysis(assetId, 30);
 
-            // Assert
-            var okResult = Assert.IsType<OkObjectResult>(result);
+            // Assert - Inspect result.Result because return type is ActionResult<T>
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var response = Assert.IsType<ApiResponse<RiskAnalysisResponseDto>>(okResult.Value);
             Assert.True(response.Succeeded);
             Assert.NotNull(response.Data);
@@ -70,26 +70,19 @@ namespace CryptoRiskAnalysis.Tests.Controllers
         }
 
         [Fact]
-        public async Task GetRiskAnalysis_InvalidDays_DefaultsTo30()
+        public async Task GetRiskAnalysis_InvalidDays_ReturnsBadRequest()
         {
             // Arrange
             var assetId = "bitcoin";
-            var priceHistory = new List<PriceData>
-            {
-                new PriceData { Timestamp = 1000, Price = 100m }
-            };
-
-            _mockCryptoService.Setup(s => s.GetAllMarketDataAsync(assetId, 30))
-                .ReturnsAsync((priceHistory, 1000m, 900m));
-            _mockRiskEngine.Setup(e => e.CalculateRisk(It.IsAny<List<PriceData>>(), 1000m, 900m))
-                .Returns(new RiskScoreResult { CompositeRiskScore = 50m, PriceHistory = priceHistory });
 
             // Act - Pass invalid days (e.g., 0)
             var result = await _controller.GetRiskAnalysis(assetId, 0);
 
-            // Assert - Should default to 30
-            var okResult = Assert.IsType<OkObjectResult>(result);
-            _mockCryptoService.Verify(s => s.GetAllMarketDataAsync(assetId, 30), Times.Once);
+            // Assert - Should return 400 Bad Request
+            var badRequestResult = Assert.IsType<BadRequestObjectResult>(result.Result);
+            var response = Assert.IsType<ApiResponse<RiskAnalysisResponseDto>>(badRequestResult.Value);
+            Assert.False(response.Succeeded);
+            Assert.Contains("Geçersiz gün", response.Message);
         }
 
         [Fact]
@@ -103,27 +96,24 @@ namespace CryptoRiskAnalysis.Tests.Controllers
             // Act
             var result = await _controller.GetRiskAnalysis(assetId, 30);
 
-            // Assert
-            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result);
+            // Assert - Inspect result.Result because return type is ActionResult<T>
+            var notFoundResult = Assert.IsType<NotFoundObjectResult>(result.Result);
             var response = Assert.IsType<ApiResponse<RiskAnalysisResponseDto>>(notFoundResult.Value);
             Assert.False(response.Succeeded);
             Assert.Contains("No data found", response.Message);
         }
 
         [Fact]
-        public async Task GetRiskAnalysis_ServiceThrowsException_ReturnsInternalServerError()
+        public async Task GetRiskAnalysis_ServiceThrowsException_ThrowsExceptionToMiddleware()
         {
             // Arrange
             var assetId = "bitcoin";
             _mockCryptoService.Setup(s => s.GetAllMarketDataAsync(assetId, 30))
                 .ThrowsAsync(new Exception("API failure"));
 
-            // Act
-            var result = await _controller.GetRiskAnalysis(assetId, 30);
-
-            // Assert
-            var objectResult = Assert.IsType<ObjectResult>(result);
-            Assert.Equal(500, objectResult.StatusCode);
+            // Act & Assert - Controller delegates exception to global ExceptionHandlingMiddleware at runtime
+            await Assert.ThrowsAsync<Exception>(async () =>
+                await _controller.GetRiskAnalysis(assetId, 30));
         }
 
         [Fact]
@@ -156,9 +146,10 @@ namespace CryptoRiskAnalysis.Tests.Controllers
             var result = await _controller.GetRiskAnalysis(assetId, 7);
 
             // Assert - Response should only contain 7 days
-            var okResult = Assert.IsType<OkObjectResult>(result);
+            var okResult = Assert.IsType<OkObjectResult>(result.Result);
             var response = Assert.IsType<ApiResponse<RiskAnalysisResponseDto>>(okResult.Value);
-            Assert.Equal(7, response.Data.PriceHistory.Count);
+            Assert.NotNull(response.Data);
+            Assert.Equal(7, response.Data!.PriceHistory.Count);
         }
     }
 }
