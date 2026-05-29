@@ -88,7 +88,8 @@ namespace CryptoRiskAnalysis.API.Services
             var returns = new List<double>();
             for (int i = 1; i < prices.Count; i++)
             {
-                if (prices[i - 1] == 0 || prices[i] == 0) continue;
+                // Guard against division-by-zero and negative prices (would cause NaN in Math.Log)
+                if (prices[i - 1] <= 0 || prices[i] <= 0) continue;
                 // Log return: ln(P_t / P_t-1)
                 var logReturn = Math.Log((double)(prices[i] / prices[i - 1]));
                 returns.Add(logReturn);
@@ -138,6 +139,8 @@ namespace CryptoRiskAnalysis.API.Services
             var avgRecent = recentDays.Average();
             var avgLongTerm = prices.Average();
 
+            if (avgLongTerm == 0) return 50m; // Default trend score if long-term average is zero
+
             // Momentum: short-term avg vs long-term avg
             var momentum = (avgRecent - avgLongTerm) / avgLongTerm;
             var absMomentum = Math.Abs(momentum);
@@ -186,7 +189,7 @@ namespace CryptoRiskAnalysis.API.Services
             {
                 var recent = prices.Last();
                 var weekAgo = prices[prices.Count - 7];
-                priceChange = (recent - weekAgo) / weekAgo;
+                priceChange = weekAgo == 0 ? 0 : (recent - weekAgo) / weekAgo;
             }
 
             decimal score = 40m; // Base score
@@ -330,7 +333,7 @@ namespace CryptoRiskAnalysis.API.Services
                 if (price > peak)
                     peak = price;
 
-                var drawdown = (peak - price) / peak * 100; // Percentage decline
+                var drawdown = peak == 0 ? 0m : (peak - price) / peak * 100; // Percentage decline
                 if (drawdown > maxDrawdown)
                     maxDrawdown = drawdown;
             }
@@ -387,7 +390,8 @@ namespace CryptoRiskAnalysis.API.Services
             }
 
             // Convert to percentage (make positive for clarity)
-            var dailyVaR = Math.Abs(var95 * 100);
+            // If the 5th percentile is positive (bull market), VaR is 0 (no loss risk in 95% of cases)
+            var dailyVaR = var95 >= 0 ? 0 : Math.Abs(var95 * 100);
 
             return (decimal)dailyVaR;
         }
@@ -413,6 +417,7 @@ namespace CryptoRiskAnalysis.API.Services
         /// </summary>
         private static double CalculateStdDev(List<double> values)
         {
+            if (values == null || values.Count < 2) return 0;
             var mean = values.Average();
             var sumOfSquares = values.Sum(v => Math.Pow(v - mean, 2));
             var variance = sumOfSquares / (values.Count - 1);

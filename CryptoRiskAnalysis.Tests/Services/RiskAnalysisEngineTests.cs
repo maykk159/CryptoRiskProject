@@ -1,4 +1,6 @@
 using Xunit;
+using Moq;
+using Microsoft.Extensions.Logging;
 using CryptoRiskAnalysis.API.Services;
 using CryptoRiskAnalysis.API.Models;
 
@@ -10,7 +12,8 @@ namespace CryptoRiskAnalysis.Tests.Services
 
         public RiskAnalysisEngineTests()
         {
-            _engine = new RiskAnalysisEngine();
+            var mockLogger = new Mock<ILogger<RiskAnalysisEngine>>();
+            _engine = new RiskAnalysisEngine(mockLogger.Object);
         }
 
         [Fact]
@@ -155,8 +158,8 @@ namespace CryptoRiskAnalysis.Tests.Services
                 });
             }
 
-            // Act - Current volume much higher than average
-            var result = _engine.CalculateRisk(priceHistory, 2000m, 1000m);
+            // Act - Current volume higher than average
+            var result = _engine.CalculateRisk(priceHistory, 1200m, 1000m);
 
             // Assert - High volume relative to average = low liquidity risk
             Assert.InRange(result.VolumeScore, 0, 40);

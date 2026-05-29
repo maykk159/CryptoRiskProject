@@ -57,9 +57,14 @@ namespace CryptoRiskAnalysis.API.Services
             if (klines == null || klines.Count == 0)
                 throw new Exception($"No kline data returned for {symbol}");
 
+            // Filter out any malformed candles to prevent IndexOutOfRangeException
+            var validKlines = klines.Where(k => k.Count >= 6).ToList();
+            if (validKlines.Count == 0)
+                throw new Exception($"No valid kline data returned for {symbol}");
+
             // 5. Parse klines into PriceData
             // Binance returns: [timestamp(number), open(string), high(string), low(string), close(string), volume(string), ...]
-            var priceHistory = klines.Select(k => new PriceData
+            var priceHistory = validKlines.Select(k => new PriceData
             {
                 // Timestamp is a number
                 Timestamp = k[0].ValueKind == JsonValueKind.Number
@@ -73,7 +78,7 @@ namespace CryptoRiskAnalysis.API.Services
 
             // 6. Calculate volume metrics (volume is at index 5)
             // Use the last COMPLETED candle (index ^2) — not the live candle which starts at 0.
-            var volumes = klines.Select(k =>
+            var volumes = validKlines.Select(k =>
                 k[5].ValueKind == JsonValueKind.String
                     ? decimal.Parse(k[5].GetString()!, System.Globalization.CultureInfo.InvariantCulture)
                     : k[5].GetDecimal()

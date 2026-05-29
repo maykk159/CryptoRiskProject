@@ -48,6 +48,7 @@ interface RiskScoreCardProps {
     ticker: string;
     icon: string;
   };
+  currentPrice?: number;
 }
 
 // ─── ScoreBar ────────────────────────────────────────────────────────────────
@@ -124,7 +125,7 @@ const ScoreBar: React.FC<{
 
 // ─── RiskScoreCard ────────────────────────────────────────────────────────────
 
-export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset }) => {
+export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset, currentPrice }) => {
   // ✅ Hook called at the top level — NOT inside JSX (was a Rules of Hooks violation before)
   const animatedCompositeScore = useAnimatedNumber(data.compositeRiskScore, 1000);
 
@@ -155,9 +156,14 @@ export const RiskScoreCard: React.FC<RiskScoreCardProps> = ({ data, asset }) => 
             </div>
           </div>
         )}
-        <h2 className="text-xl font-bold text-white">
-          {asset ? asset.name : 'Risk Analysis'}
-          {asset && <span className="ml-2 text-gray-400 text-lg">({asset.ticker})</span>}
+        <h2 className="text-xl font-bold text-white flex items-center gap-2 flex-wrap">
+          <span>{asset ? asset.name : 'Risk Analysis'}</span>
+          {asset && <span className="text-gray-400 text-lg">({asset.ticker})</span>}
+          {currentPrice !== undefined && currentPrice !== null && (
+            <span className="ml-3 px-3 py-1 text-base font-bold bg-emerald-950/40 text-emerald-400 border border-emerald-500/25 rounded-xl font-mono tracking-tight shadow-inner">
+              ${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}
+            </span>
+          )}
         </h2>
       </div>
 

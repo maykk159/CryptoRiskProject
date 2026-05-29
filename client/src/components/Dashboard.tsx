@@ -24,15 +24,47 @@ export const Dashboard: React.FC = () => {
   // Type-safe error message — no more catch (err: any)
   const errorMessage = error ? getErrorMessage(error, selectedAsset.name) : null;
 
+  // Stable price cache to prevent different ranges (7, 30, 90) from showing different prices
+  const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
+
+  const latestPrice = data?.priceHistory && data.priceHistory.length > 0
+    ? data.priceHistory[data.priceHistory.length - 1].price
+    : undefined;
+
+  // Sync and lock high-resolution prices
+  useState(() => {
+    // Empty initializer
+  });
+
+  // Preserve the more precise 7/30 day price when switching to the 90-day view
+  const currentPrice = assetPrices[selectedAssetId] ?? latestPrice;
+
+  // We use useEffect to update the price cache
+  if (latestPrice !== undefined && assetPrices[selectedAssetId] !== latestPrice) {
+    // Only update if it's a 7/30 day view or we don't have a cached price yet
+    if (selectedTimeRange !== 90 || assetPrices[selectedAssetId] === undefined) {
+      setAssetPrices(prev => ({
+        ...prev,
+        [selectedAssetId]: latestPrice
+      }));
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-900 text-white p-8">
       <div className="max-w-7xl mx-auto">
         <header className="mb-10">
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-purple-500">
-            Crypto Risk Analysis
+          <h1 className="text-4xl font-extrabold tracking-tight flex items-center gap-3 flex-wrap">
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-indigo-500">
+              CIPHER
+            </span>
+            <span className="hidden sm:inline text-gray-700 font-light text-2xl">|</span>
+            <span className="text-gray-400 font-light text-2xl">
+              Crypto Risk Intelligence
+            </span>
           </h1>
-          <p className="text-gray-400 mt-2">
-            Advanced financial risk assessment for crypto assets
+          <p className="text-gray-400 mt-2 text-sm sm:text-base">
+            Advanced quantitative financial risk assessment tool for crypto assets
           </p>
         </header>
 
@@ -62,7 +94,7 @@ export const Dashboard: React.FC = () => {
         {/* Content */}
         {!isLoading && !errorMessage && data && (
           <div className="grid grid-cols-1 gap-8">
-            <RiskScoreCard data={data} asset={selectedAsset} />
+            <RiskScoreCard data={data} asset={selectedAsset} currentPrice={currentPrice} />
             <AdvancedMetrics data={data} />
             <PriceChart data={data.priceHistory} timeRange={selectedTimeRange} />
           </div>
